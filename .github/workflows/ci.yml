@@ -269,6 +269,15 @@ jobs:
           name: quality-reports
           path: artifacts/quality
 
+      # Attestations are pushed to the registry as OCI referrers, which needs a
+      # registry session in this job; credentials are not shared between jobs.
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Attest build provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
