@@ -8,10 +8,21 @@ export class ApiError extends Error {
   }
 }
 
-const JSON_HEADERS = { Accept: 'application/json' }
+import { apiUrl } from './config'
+import { getSandboxToken } from './session'
+
+function requestHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  const token = getSandboxToken()
+  if (token) {
+    headers['X-Sandbox-Token'] = token
+  }
+
+  return headers
+}
 
 export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(path, { headers: JSON_HEADERS, signal })
+  const response = await fetch(apiUrl(path), { headers: requestHeaders(), signal })
 
   if (!response.ok) {
     throw new ApiError(await readProblem(response), response.status)
@@ -21,9 +32,9 @@ export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<
 }
 
 export async function postJson<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method: 'POST',
-    headers: { ...JSON_HEADERS, 'Content-Type': 'application/json', ...headers },
+    headers: { ...requestHeaders(), 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   })
 

@@ -8,6 +8,11 @@ This is not a dashboard mock-up. The numbers on the proof page are produced by t
 
 ---
 
+## Live demo
+
+- **Client:** <https://just4skii.github.io/break-me-if-you-can/> — built and deployed by `.github/workflows/pages.yml`.
+- **API and database:** the API host is not connected yet. Until the repository variable `API_BASE_URL` points at a deployed API, the Pages build shows an explicit static-preview notice and never fabricates proof or arena results. See [docs/hosting.md](docs/hosting.md).
+
 ## Start here — 2 minute walkthrough
 
 1. **Open `/proof`.** Read the verdict word first: `"Verified"`, `"Failed"` or `"Unknown"`. Below it, the digest chain shows the four values that have to agree before a release can be verified: the built image, the attested image, the digest the deployment asked Fly to run, and the digest Fly reports as running. A green page is impossible if any of them is missing or different.
@@ -39,7 +44,7 @@ The release run at commit `59be9373` produced these values. They are copied from
 
 The proof endpoint was run locally against that exact evidence artifact and the live GitHub attestations API. It reports **UNKNOWN** — 14 of 20 required checks verified — because the requested and observed deployment digests, and the runtime repository, do not exist until a deploy. That is the intended behaviour: the build and its provenance are proven, the runtime is not observed, so the release is not verified.
 
-The runtime-verification correction described in `docs/deployment-verification.md` adds 21 tests; the suite is now 149 (126 unit, 23 integration), verified by the correction's pull-request run [42371375446](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42371375446).
+The runtime-verification correction described in `docs/deployment-verification.md` adds 21 tests; the suite is now 151 (126 unit, 25 integration), verified by the correction's pull-request run [42371375446](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42371375446).
 
 ```
 $ curl -s -H 'Accept: application/json' http://localhost:5099/api/proof | jq '{state, summary, built: .image.builtDigest, attested: .image.attestedDigest}'
@@ -166,6 +171,9 @@ Every action is pinned to a full commit SHA. Versions were resolved from the tag
 | Action | Version | Pinned commit | Release |
 | --- | --- | --- | --- |
 | `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` | https://github.com/actions/checkout/releases/tag/v5.1.0 |
+| `actions/configure-pages` | v6.0.0 | `45bfe0192ca1faeb007ade9deae92b16b8254a0d` | https://github.com/actions/configure-pages/releases/tag/v6.0.0 |
+| `actions/upload-pages-artifact` | v5.0.0 | `fc324d3547104276b827a68afc52ff2a11cc49c9` | https://github.com/actions/upload-pages-artifact/releases/tag/v5.0.0 |
+| `actions/deploy-pages` | v5.0.1 | `368f82528645a54fb793d4d04e342629a3f51346` | https://github.com/actions/deploy-pages/releases/tag/v5.0.1 |
 | `actions/setup-dotnet` | v4.3.1 | `67a3573c9a986a3f9c594539f4ab511d57bb3ce9` | https://github.com/actions/setup-dotnet/releases/tag/v4.3.1 |
 | `actions/setup-node` | v4.4.0 | `49933ea5288caeca8642d1e84afbd3f7d6820020` | https://github.com/actions/setup-node/releases/tag/v4.4.0 |
 | `actions/upload-artifact` | v4.6.2 | `ea165f8d65b6e75b540449e92b4886f43607fa02` | https://github.com/actions/upload-artifact/releases/tag/v4.6.2 |
@@ -277,6 +285,10 @@ The Dockerfile builds the React bundle and publishes the API with `-p:CommitSha`
 
 ---
 
+## Hosting
+
+The public client is on GitHub Pages; the API and PostgreSQL are hosted separately. Supabase is the database, and the API host comparison, environment variables and go-live checklist are in [docs/hosting.md](docs/hosting.md). The original Fly.io deployment below remains the only implemented path that can observe the running image digest; a free host that does not expose a platform-resolved digest keeps the runtime checks honestly UNKNOWN.
+
 ## Deployment (Fly.io)
 
 Target region: **Johannesburg (`jnb`)**. The deployment path is implemented but **not yet executed**, because it requires a Fly account, a paid machine and secrets. Until it runs, `/proof` correctly reports `UNKNOWN` rather than a green state.
@@ -383,7 +395,7 @@ docs/adr/                                 architecture decision records
 Verified locally:
 
 - Release build with warnings as errors and a formatting gate.
-- 149 automated tests (126 unit, 23 PostgreSQL integration) all passing; the last release run recorded 128 before the runtime-verification correction.
+- 151 automated tests (126 unit, 25 PostgreSQL integration) all passing; the last release run recorded 128 before the runtime-verification and cross-origin corrections.
 - Coverage 86.94% line / 73.5% branch against the 75% gate.
 - A clean NuGet advisory audit.
 - A Docker image build of the API plus the React bundle.

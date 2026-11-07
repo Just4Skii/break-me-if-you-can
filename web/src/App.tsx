@@ -5,9 +5,11 @@ import { ArenaPage } from './pages/ArenaPage'
 import { TourPage } from './pages/TourPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
+const basename = import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL.replace(/\/$/, '')
+
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <Routes>
         <Route element={<Shell />}>
           <Route index element={<Navigate to="/proof" replace />} />

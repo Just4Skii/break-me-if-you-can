@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
+import { apiConfigured } from '../config'
 import type { HealthReport, Meta } from '../types'
 import { shortSha } from '../format'
 import { Logo } from './Logo'
@@ -100,6 +101,17 @@ export function Shell() {
             {navLinks('topnav-item')}
           </nav>
         </header>
+
+        {!apiConfigured ? (
+          <div className="api-notice" role="status">
+            <span className="api-notice-label">Static preview</span>
+            <p>
+              This GitHub Pages build is not connected to an API, so the engineering proof and the arena
+              cannot load. Set the <code>VITE_API_BASE_URL</code> repository variable and redeploy. The Code
+              Tour is complete without it.
+            </p>
+          </div>
+        ) : null}
 
         <main className="content">
           <Outlet />

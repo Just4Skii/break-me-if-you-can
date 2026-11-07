@@ -5,7 +5,7 @@ Every criterion from the mandate, with the evidence that supports it. A criterio
 | # | Criterion | Status | Evidence |
 | --- | --- | --- | --- |
 | 1 | Reproducible builds | Met with a documented residual | NuGet `packages.lock.json` for all five projects and `--locked-mode` restores in CI and Docker; `npm ci` from the lockfile; base images pinned by digest (`Dockerfile`); deterministic .NET build. Residual: `apt-get install curl` is not version-pinned, so the OS layer is not hermetic. See ADR 007. |
-| 2 | Passing automated tests | Met | 149 tests: 126 unit + 23 PostgreSQL integration (the last release run before the runtime-verification correction recorded 128). Local run and CI run [42369465155](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42369465155). |
+| 2 | Passing automated tests | Met | 151 tests: 126 unit + 25 PostgreSQL integration (the last release run before the runtime-verification and cross-origin corrections recorded 128). Local run and CI run [42369465155](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42369465155). |
 | 3 | Enforced coverage threshold | Met | Merged Cobertura reports: 86.94% line / 73.5% branch against a 75% line gate. A missing `Summary.txt` fails the step. |
 | 4 | Parsed dependency audit evidence | Met | `dotnet list package --vulnerable --include-transitive --format json` parsed by the generator; clean; a failed or missing audit fails the release policy. |
 | 5 | Valid image attestations | Met | SLSA build provenance and the custom quality predicate, pushed to GHCR and verified with `gh attestation verify` in CI. The attestations API was queried independently and its DSSE payload inspected. |

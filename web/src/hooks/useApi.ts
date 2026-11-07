@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, fetchJson } from '../api'
+import { apiConfigured } from '../config'
 
 export type AsyncState<T> =
   | { status: 'loading' }
@@ -14,6 +15,14 @@ export function useApi<T>(path: string | null, refreshKey = 0): AsyncState<T> & 
 
   useEffect(() => {
     if (!path) return
+
+    if (!apiConfigured) {
+      setState({
+        status: 'error',
+        error: 'The API endpoint is not configured for this static build. Set VITE_API_BASE_URL and redeploy.',
+      })
+      return
+    }
 
     const controller = new AbortController()
     let active = true

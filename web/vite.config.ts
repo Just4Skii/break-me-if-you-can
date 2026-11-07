@@ -2,8 +2,10 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 const apiTarget = process.env.API_TARGET ?? 'http://localhost:5099'
+const base = process.env.VITE_BASE_PATH ?? '/'
 
 export default defineConfig({
+  base,
   plugins: [react()],
   build: {
     outDir: 'dist',
