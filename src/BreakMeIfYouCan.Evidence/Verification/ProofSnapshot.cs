@@ -53,6 +53,15 @@ public sealed record RuntimeObservation
 
     public string? ImageReference { get; init; }
 
+    /// <summary>Registry reported by the platform for the running image, for example ghcr.io.</summary>
+    public string? Registry { get; init; }
+
+    /// <summary>Repository reported by the platform, for example owner/repo.</summary>
+    public string? Repository { get; init; }
+
+    /// <summary>Number of machines the observation covers. More than one must agree.</summary>
+    public int? MachineCount { get; init; }
+
     public string? AppName { get; init; }
 
     public string? MachineId { get; init; }
