@@ -1,3 +1,4 @@
+using BreakMeIfYouCan.Api.Competition;
 using Microsoft.EntityFrameworkCore;
 
 namespace BreakMeIfYouCan.Api.Data;
@@ -11,6 +12,12 @@ public sealed class ArenaDbContext(DbContextOptions<ArenaDbContext> options) : D
     public DbSet<Transfer> Transfers => Set<Transfer>();
 
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+
+    public DbSet<Player> Players => Set<Player>();
+
+    public DbSet<PlayerSession> PlayerSessions => Set<PlayerSession>();
+
+    public DbSet<ChallengeRun> ChallengeRuns => Set<ChallengeRun>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -102,6 +109,61 @@ public sealed class ArenaDbContext(DbContextOptions<ArenaDbContext> options) : D
                 .IsUnique()
                 .HasDatabaseName("ux_ledger_entries_transfer_direction");
             entity.HasIndex(e => e.AccountId).HasDatabaseName("ix_ledger_entries_account");
+        });
+
+        modelBuilder.Entity<Player>(entity =>
+        {
+            entity.ToTable("players");
+            entity.HasKey(player => player.Id);
+            entity.Property(player => player.Username).HasMaxLength(24).IsRequired();
+            entity.Property(player => player.UsernameNormalized).HasMaxLength(24).IsRequired();
+            entity.Property(player => player.PasswordHash).HasMaxLength(256).IsRequired();
+            entity.Property(player => player.CreatedAt).IsRequired();
+            entity.HasIndex(player => player.UsernameNormalized)
+                .IsUnique()
+                .HasDatabaseName("ux_players_username_normalized");
+        });
+
+        modelBuilder.Entity<PlayerSession>(entity =>
+        {
+            entity.ToTable("player_sessions");
+            entity.HasKey(session => session.Id);
+            entity.Property(session => session.TokenHash).HasMaxLength(64).IsRequired();
+            entity.Property(session => session.CreatedAt).IsRequired();
+            entity.Property(session => session.ExpiresAt).IsRequired();
+            entity.HasIndex(session => session.TokenHash)
+                .IsUnique()
+                .HasDatabaseName("ux_player_sessions_token");
+            entity.HasIndex(session => session.PlayerId).HasDatabaseName("ix_player_sessions_player");
+            entity.HasOne(session => session.Player)
+                .WithMany(player => player.Sessions)
+                .HasForeignKey(session => session.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChallengeRun>(entity =>
+        {
+            entity.ToTable("challenge_runs", table =>
+            {
+                table.HasCheckConstraint("ck_challenge_runs_requests_positive", "requests > 0");
+                table.HasCheckConstraint("ck_challenge_runs_duration_non_negative", "duration_ms >= 0");
+                table.HasCheckConstraint("ck_challenge_runs_score_non_negative", "score >= 0");
+            });
+            entity.HasKey(run => run.Id);
+            entity.Property(run => run.ChallengeKey).HasMaxLength(64).IsRequired();
+            entity.Property(run => run.Strategy).HasMaxLength(16).IsRequired();
+            entity.Property(run => run.Pattern).HasMaxLength(24).IsRequired();
+            entity.Property(run => run.Idempotency).HasMaxLength(16).IsRequired();
+            entity.Property(run => run.IntegrityJson).HasColumnType("text").IsRequired();
+            entity.Property(run => run.CreatedAt).IsRequired();
+            entity.HasIndex(run => new { run.ChallengeKey, run.Score })
+                .HasDatabaseName("ix_challenge_runs_leaderboard");
+            entity.HasIndex(run => new { run.PlayerId, run.CreatedAt })
+                .HasDatabaseName("ix_challenge_runs_player_created");
+            entity.HasOne(run => run.Player)
+                .WithMany(player => player.Runs)
+                .HasForeignKey(run => run.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         ApplySnakeCaseColumnNames(modelBuilder);

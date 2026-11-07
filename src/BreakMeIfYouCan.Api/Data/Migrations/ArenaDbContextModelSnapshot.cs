@@ -23,6 +23,195 @@ namespace BreakMeIfYouCan.Api.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("BreakMeIfYouCan.Api.Competition.ChallengeRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Accepted")
+                        .HasColumnType("integer")
+                        .HasColumnName("accepted");
+
+                    b.Property<long>("AmountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_cents");
+
+                    b.Property<string>("ChallengeKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("challenge_key");
+
+                    b.Property<int>("Concurrency")
+                        .HasColumnType("integer")
+                        .HasColumnName("concurrency");
+
+                    b.Property<int>("Conflicts")
+                        .HasColumnType("integer")
+                        .HasColumnName("conflicts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<double>("DurationMs")
+                        .HasColumnType("double precision")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("Idempotency")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("idempotency");
+
+                    b.Property<string>("IntegrityJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("integrity_json");
+
+                    b.Property<string>("Pattern")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("pattern");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("player_id");
+
+                    b.Property<int>("Rejected")
+                        .HasColumnType("integer")
+                        .HasColumnName("rejected");
+
+                    b.Property<int>("Replayed")
+                        .HasColumnType("integer")
+                        .HasColumnName("replayed");
+
+                    b.Property<int>("Requests")
+                        .HasColumnType("integer")
+                        .HasColumnName("requests");
+
+                    b.Property<Guid>("SandboxId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sandbox_id");
+
+                    b.Property<long>("Score")
+                        .HasColumnType("bigint")
+                        .HasColumnName("score");
+
+                    b.Property<string>("Strategy")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("strategy");
+
+                    b.Property<int>("TotalRetries")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_retries");
+
+                    b.Property<bool>("Verified")
+                        .HasColumnType("boolean")
+                        .HasColumnName("verified");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChallengeKey", "Score")
+                        .HasDatabaseName("ix_challenge_runs_leaderboard");
+
+                    b.HasIndex("PlayerId", "CreatedAt")
+                        .HasDatabaseName("ix_challenge_runs_player_created");
+
+                    b.ToTable("challenge_runs", "arena", t =>
+                        {
+                            t.HasCheckConstraint("ck_challenge_runs_duration_non_negative", "duration_ms >= 0");
+
+                            t.HasCheckConstraint("ck_challenge_runs_requests_positive", "requests > 0");
+
+                            t.HasCheckConstraint("ck_challenge_runs_score_non_negative", "score >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("BreakMeIfYouCan.Api.Competition.Player", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("username");
+
+                    b.Property<string>("UsernameNormalized")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("username_normalized");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsernameNormalized")
+                        .IsUnique()
+                        .HasDatabaseName("ux_players_username_normalized");
+
+                    b.ToTable("players", "arena");
+                });
+
+            modelBuilder.Entity("BreakMeIfYouCan.Api.Competition.PlayerSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("player_id");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerId")
+                        .HasDatabaseName("ix_player_sessions_player");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_player_sessions_token");
+
+                    b.ToTable("player_sessions", "arena");
+                });
+
             modelBuilder.Entity("BreakMeIfYouCan.Api.Data.Account", b =>
                 {
                     b.Property<Guid>("Id")
@@ -242,6 +431,28 @@ namespace BreakMeIfYouCan.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BreakMeIfYouCan.Api.Competition.ChallengeRun", b =>
+                {
+                    b.HasOne("BreakMeIfYouCan.Api.Competition.Player", "Player")
+                        .WithMany("Runs")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("BreakMeIfYouCan.Api.Competition.PlayerSession", b =>
+                {
+                    b.HasOne("BreakMeIfYouCan.Api.Competition.Player", "Player")
+                        .WithMany("Sessions")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+                });
+
             modelBuilder.Entity("BreakMeIfYouCan.Api.Data.Account", b =>
                 {
                     b.HasOne("BreakMeIfYouCan.Api.Data.Sandbox", "Sandbox")
@@ -260,6 +471,13 @@ namespace BreakMeIfYouCan.Api.Data.Migrations
                         .HasForeignKey("TransferId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("BreakMeIfYouCan.Api.Competition.Player", b =>
+                {
+                    b.Navigation("Runs");
+
+                    b.Navigation("Sessions");
                 });
 
             modelBuilder.Entity("BreakMeIfYouCan.Api.Data.Sandbox", b =>

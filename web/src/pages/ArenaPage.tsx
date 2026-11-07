@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ApiError, postJson } from '../api'
 import { useApi } from '../hooks/useApi'
 import type {
   ArenaRunResult,
+  ChallengeRunView,
+  ChallengeView,
   LedgerView,
   RunRequest,
   SandboxView,
@@ -10,6 +13,7 @@ import type {
 import { formatDurationMs, formatNumber, formatTimestamp, formatZar, shortSha } from '../format'
 import { CheckIcon, CrossIcon, PlayIcon, RefreshIcon } from '../components/Icons'
 import { setSandboxToken } from '../session'
+import { getStoredPlayer } from '../auth'
 import { SectionHead } from '../components/SectionHead'
 
 type Strategy = 'optimistic' | 'pessimistic'
@@ -44,6 +48,13 @@ export function ArenaPage() {
   const [history, setHistory] = useState<Partial<Record<Strategy, ArenaRunResult>>>({})
   const [showAllReceipts, setShowAllReceipts] = useState(false)
 
+  const player = getStoredPlayer()
+  const challenges = useApi<ChallengeView[]>('/api/challenges')
+  const [rankedKey, setRankedKey] = useState('optimistic-8')
+  const [ranked, setRanked] = useState<ChallengeRunView | null>(null)
+  const [rankedRunning, setRankedRunning] = useState(false)
+  const [rankedError, setRankedError] = useState<string | null>(null)
+
   const limits = session.status === 'success' ? session.data.limits : undefined
   const sessionToken = session.status === 'success' ? session.data.sandboxToken : undefined
 
@@ -54,6 +65,30 @@ export function ArenaPage() {
   }, [sessionToken])
 
   const update = (patch: Partial<FormState>) => setForm((current) => ({ ...current, ...patch }))
+
+  const selectedChallenge = challenges.status === 'success'
+    ? challenges.data.find((item) => item.key === rankedKey)
+    : undefined
+
+  const runRanked = async () => {
+    if (!player) return
+
+    setRankedRunning(true)
+    setRankedError(null)
+
+    try {
+      const data = await postJson<ChallengeRunView>(
+        '/api/challenges/' + encodeURIComponent(rankedKey) + '/run',
+        {},
+      )
+      setRanked(data)
+      setRefresh((value) => value + 1)
+    } catch (caught) {
+      setRankedError(caught instanceof ApiError ? caught.message : 'The ranked run could not be completed.')
+    } finally {
+      setRankedRunning(false)
+    }
+  }
 
   const run = async () => {
     setRunning(true)
@@ -139,6 +174,62 @@ export function ArenaPage() {
           )}
         </div>
       </header>
+
+      <section className="ranked-panel" aria-label="Ranked challenge">
+        <div className="ranked-head">
+          <div>
+            <span className="label">Ranked challenge · server-executed</span>
+            <h2>Put a verified score on the board.</h2>
+          </div>
+          <Link className="link-arrow" to="/leaderboard">Leaderboard →</Link>
+        </div>
+
+        {player ? (
+          <>
+            <div className="ranked-controls">
+              <select
+                className="ranked-select"
+                aria-label="Ranked challenge"
+                value={rankedKey}
+                onChange={(event) => { setRankedKey(event.target.value); setRanked(null) }}
+              >
+                {(challenges.status === 'success' ? challenges.data : []).map((item) => (
+                  <option key={item.key} value={item.key}>{item.name}</option>
+                ))}
+              </select>
+              <button className="btn btn-primary run-button ranked-run-button" type="button" onClick={runRanked} disabled={rankedRunning}>
+                {rankedRunning ? 'Running…' : 'Run ranked challenge'}
+              </button>
+            </div>
+            <p className="control-note">
+              {selectedChallenge?.summary ?? 'The server fixes the transfers, concurrency and strategy; the client cannot submit a score.'}
+            </p>
+            {rankedError ? <p className="arena-error" role="alert">{rankedError}</p> : null}
+            {ranked ? (
+              <div className="ranked-result">
+                <div className="ranked-verdict">
+                  <span className={'run-state ' + (ranked.verified ? 'ok' : 'bad')}>
+                    {ranked.verified ? 'Verified' : 'Not ranked'}
+                  </span>
+                  <span className="mono">{ranked.challenge.name}</span>
+                </div>
+                <div className="ranked-stats">
+                  <div><span className="label">Score</span><strong>{formatNumber(ranked.score)}</strong></div>
+                  <div><span className="label">Rank</span><strong>{ranked.rank ? '#' + ranked.rank : '—'}</strong></div>
+                  <div><span className="label">Personal best</span><strong>{formatNumber(ranked.personalBest)}</strong></div>
+                  <div><span className="label">Accepted</span><strong>{ranked.run.accepted} / {ranked.run.requested}</strong></div>
+                </div>
+                <Link className="link-arrow" to="/leaderboard">See where you stand →</Link>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="control-note">
+            The ranked run is saved only after you sign in.{' '}
+            <Link className="link-arrow" to="/login?next=/arena">Sign in or create an account →</Link>
+          </p>
+        )}
+      </section>
 
       <div className="arena-body">
         <aside className="arena-controls" aria-label="Run configuration">

@@ -9,6 +9,7 @@ import './styles/base.css'
 import './styles/shell.css'
 import './styles/proof.css'
 import './styles/arena.css'
+import './styles/competition.css'
 import './styles/tour.css'
 import App from './App'
 

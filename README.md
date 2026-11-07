@@ -44,7 +44,7 @@ The release run at commit `59be9373` produced these values. They are copied from
 
 The proof endpoint was run locally against that exact evidence artifact and the live GitHub attestations API. It reports **UNKNOWN** — 14 of 20 required checks verified — because the requested and observed deployment digests, and the runtime repository, do not exist until a deploy. That is the intended behaviour: the build and its provenance are proven, the runtime is not observed, so the release is not verified.
 
-The runtime-verification correction described in `docs/deployment-verification.md` adds 21 tests; the suite is now 151 (126 unit, 25 integration), verified by the correction's pull-request run [42371375446](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42371375446).
+The runtime-verification correction described in `docs/deployment-verification.md` adds 21 tests; the suite was 151 (126 unit, 25 integration) after it, verified by that correction's pull-request run [42371375446](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42371375446). Player accounts and the leaderboard add 8 more, so the suite is now 159 (130 unit, 29 integration); those 8 were verified locally and have not yet run in CI.
 
 ```
 $ curl -s -H 'Accept: application/json' http://localhost:5099/api/proof | jq '{state, summary, built: .image.builtDigest, attested: .image.attestedDigest}'
@@ -68,17 +68,18 @@ gh attestation verify oci://ghcr.io/just4skii/break-me-if-you-can@sha256:9f51dbd
 
 ## What this is
 
-Three experiences, one deployable ASP.NET Core process and one PostgreSQL database.
+Four experiences, one deployable ASP.NET Core process and one PostgreSQL database.
 
 | Experience | Route | What it demonstrates |
 | --- | --- | --- |
 | Engineering proof | `/proof` (HTML) · `/api/proof` (JSON) | CI provenance, test and coverage evidence, dependency audit, image digests, attestation and the observed runtime image |
 | Race Condition Arena | `/arena` | Double-entry ledger integrity, optimistic `xmin` concurrency, pessimistic `SELECT … FOR UPDATE`, idempotency, isolation and measured contention |
+| Player accounts and leaderboard | `/login` · `/leaderboard` · `/performance` | PBKDF2 accounts with hashed bearer sessions, server-executed ranked challenges, a verified-only leaderboard and personal bests |
 | Code Tour | `/tour` | Architecture, request lifecycle, schema, transaction processing, CI/CD, attestation and ADRs, with source links |
 
-No registration is required. A visitor receives an anonymous sandbox through a protected, HttpOnly cookie.
+No registration is required for the proof, the arena or the tour. A visitor receives an anonymous sandbox through a protected, HttpOnly cookie. An account is only needed to save a ranked run and appear on the leaderboard, and the client never submits a score: the API runs the transfers and records what it measured.
 
-The initial release deliberately contains exactly these three experiences. Mutation Roulette, a security playground and chaos engineering are not implemented.
+The initial release deliberately contains exactly these four experiences. Mutation Roulette, a security playground and chaos engineering are not implemented.
 
 ---
 
@@ -395,7 +396,7 @@ docs/adr/                                 architecture decision records
 Verified locally:
 
 - Release build with warnings as errors and a formatting gate.
-- 151 automated tests (126 unit, 25 PostgreSQL integration) all passing; the last release run recorded 128 before the runtime-verification and cross-origin corrections.
+- 159 automated tests (130 unit, 29 PostgreSQL integration) all passing; the last release run recorded 128 before the runtime-verification, cross-origin and competition corrections.
 - Coverage 86.94% line / 73.5% branch against the 75% gate.
 - A clean NuGet advisory audit.
 - A Docker image build of the API plus the React bundle.

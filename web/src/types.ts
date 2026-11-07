@@ -282,3 +282,79 @@ export interface RunRequest {
   idempotency: 'unique' | 'replay'
   replayKeys: number
 }
+export interface PlayerView {
+  id: string
+  username: string
+  createdAt: string
+}
+
+export interface AuthResponse {
+  token: string
+  player: PlayerView
+}
+
+export interface ChallengeView {
+  key: string
+  name: string
+  summary: string
+  strategy: 'optimistic' | 'pessimistic'
+  requests: number
+  concurrency: number
+  amountCents: number
+}
+
+export interface LeaderboardEntryView {
+  rank: number
+  username: string
+  score: number
+  durationMs: number
+  accepted: number
+  conflicts: number
+  retries: number
+  achievedAt: string
+}
+
+export interface LeaderboardView {
+  challengeKey: string
+  challengeName: string
+  summary: string
+  entries: LeaderboardEntryView[]
+}
+
+export interface ChallengeRunView {
+  challenge: ChallengeView
+  score: number
+  verified: boolean
+  rank?: number
+  personalBest: number
+  run: ArenaRunResult
+}
+
+export interface BestRunView {
+  challengeKey: string
+  challengeName: string
+  score: number
+  durationMs: number
+  achievedAt: string
+}
+
+export interface RunHistoryView {
+  challengeKey: string
+  challengeName: string
+  score: number
+  verified: boolean
+  durationMs: number
+  accepted: number
+  rejected: number
+  conflicts: number
+  retries: number
+  createdAt: string
+}
+
+export interface PerformanceView {
+  player: PlayerView
+  bests: BestRunView[]
+  recent: RunHistoryView[]
+  totalRuns: number
+  verifiedRuns: number
+}

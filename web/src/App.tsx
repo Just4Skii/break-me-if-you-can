@@ -4,6 +4,9 @@ import { ProofPage } from './pages/ProofPage'
 import { ArenaPage } from './pages/ArenaPage'
 import { TourPage } from './pages/TourPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { LeaderboardPage } from './pages/LeaderboardPage'
+import { PerformancePage } from './pages/PerformancePage'
+import { LoginPage } from './pages/LoginPage'
 
 const basename = import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL.replace(/\/$/, '')
 
@@ -15,6 +18,9 @@ export default function App() {
           <Route index element={<Navigate to="/proof" replace />} />
           <Route path="proof" element={<ProofPage />} />
           <Route path="arena" element={<ArenaPage />} />
+          <Route path="leaderboard" element={<LeaderboardPage />} />
+          <Route path="performance" element={<PerformancePage />} />
+          <Route path="login" element={<LoginPage />} />
           <Route path="tour" element={<TourPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

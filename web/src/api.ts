@@ -10,12 +10,18 @@ export class ApiError extends Error {
 
 import { apiUrl } from './config'
 import { getSandboxToken } from './session'
+import { getStoredPlayer } from './auth'
 
 function requestHeaders(): Record<string, string> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   const token = getSandboxToken()
   if (token) {
     headers['X-Sandbox-Token'] = token
+  }
+
+  const player = getStoredPlayer()
+  if (player) {
+    headers.Authorization = 'Bearer ' + player.token
   }
 
   return headers

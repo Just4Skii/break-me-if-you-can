@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using BreakMeIfYouCan.Api.Arena;
+using BreakMeIfYouCan.Api.Competition;
 using BreakMeIfYouCan.Api.Data;
 using BreakMeIfYouCan.Api.Health;
 using BreakMeIfYouCan.Api.Infrastructure;
@@ -60,6 +61,8 @@ builder.Services.AddSingleton<LedgerIntegrityService>();
 builder.Services.AddSingleton<TransferExecutor>();
 builder.Services.AddSingleton<ArenaRunService>();
 builder.Services.AddScoped<SandboxService>();
+builder.Services.AddScoped<PlayerAuthService>();
+builder.Services.AddScoped<ChallengeService>();
 
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient(GitHubActionsClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(20));
@@ -87,6 +90,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("arena-write", context => FixedWindow(VisitorPartition(context), permitLimit: 180));
     options.AddPolicy("arena-run", context => FixedWindow(VisitorPartition(context), permitLimit: 12));
     options.AddPolicy("proof", context => FixedWindow(IpPartition(context), permitLimit: 120));
+    options.AddPolicy("auth", context => FixedWindow(IpPartition(context), permitLimit: 20));
 
     options.OnRejected = async (context, cancellationToken) =>
     {
@@ -211,6 +215,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapArenaEndpoints();
+app.MapCompetitionEndpoints();
 app.MapProofEndpoints();
 
 app.MapHealthChecks("/healthz", new HealthCheckOptions

@@ -2,7 +2,7 @@
 
 - **Date:** 2026-11-07
 - **Scope:** the initial release: ASP.NET Core API, PostgreSQL schema, React client, CI/CD pipeline, deployment configuration.
-- **Method:** code review, database review, 151 automated tests, CI execution, manual 50-transfer runs, secret scanning, `actionlint`, container build, and inspection of the live attestations API.
+- **Method:** code review, database review, 159 automated tests, CI execution, manual 50-transfer runs, secret scanning, `actionlint`, container build, and inspection of the live attestations API.
 
 This is a self-review. It is **not** a penetration test, a threat model of the hosting provider, or a complete security assessment.
 
@@ -62,7 +62,7 @@ The runtime treats the CI artifact as untrusted input: it re-validates the commi
 
 ## Verification performed
 
-- 151 automated tests (126 unit, 25 real-PostgreSQL integration), including concurrency, rollback, idempotency, isolation and database-constraint violation attempts.
+- 159 automated tests (130 unit, 29 real-PostgreSQL integration), including concurrency, rollback, idempotency, isolation and database-constraint violation attempts.
 - Every pull-request quality run and the main release runs listed in PROJECT_STATUS.md passed, including both attestations.
 - `gh attestation verify` executed in CI for SLSA provenance and the custom quality predicate.
 - The attestations API was queried independently and the DSSE payload inspected (subject digest, commit, workflow, run).

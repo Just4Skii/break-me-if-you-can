@@ -10,7 +10,9 @@ import { GithubIcon } from './Icons'
 const NAV = [
   { to: '/proof', index: '01', label: 'Proof', description: 'Release evidence' },
   { to: '/arena', index: '02', label: 'Arena', description: 'Concurrency lab' },
-  { to: '/tour', index: '03', label: 'Tour', description: 'How it works' },
+  { to: '/leaderboard', index: '03', label: 'Leaderboard', description: 'Verified runs' },
+  { to: '/performance', index: '04', label: 'Performance', description: 'Your bests' },
+  { to: '/tour', index: '05', label: 'Tour', description: 'How it works' },
 ]
 
 export function Shell() {

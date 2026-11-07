@@ -1,4 +1,5 @@
 using BreakMeIfYouCan.Api.Arena;
+using BreakMeIfYouCan.Api.Competition;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BreakMeIfYouCan.Api.Infrastructure;
@@ -11,6 +12,27 @@ public sealed class ArenaExceptionMiddleware(RequestDelegate next, ILogger<Arena
         try
         {
             await next(context);
+        }
+        catch (CompetitionException exception)
+        {
+            if (context.Response.HasStarted)
+            {
+                throw;
+            }
+
+            logger.LogInformation("Competition request rejected with {StatusCode}: {Message}", exception.StatusCode, exception.Message);
+
+            context.Response.Clear();
+            context.Response.StatusCode = exception.StatusCode;
+
+            await context.Response.WriteAsJsonAsync(new ProblemDetails
+            {
+                Status = exception.StatusCode,
+                Title = "The request could not be completed",
+                Detail = exception.Message,
+                Type = "https://breakmeifyoucan.dev/problems/competition",
+                Instance = context.Request.Path,
+            });
         }
         catch (ArenaException exception)
         {
