@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BreakMeIfYouCan.Api/BreakMeIfYouCan.Api.csproj" />
+    <Project Path="src/BreakMeIfYouCan.Evidence/BreakMeIfYouCan.Evidence.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BreakMeIfYouCan.Tests.Integration/BreakMeIfYouCan.Tests.Integration.csproj" />
+    <Project Path="tests/BreakMeIfYouCan.Tests.Unit/BreakMeIfYouCan.Tests.Unit.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/BreakMeIfYouCan.EvidenceGenerator/BreakMeIfYouCan.EvidenceGenerator.csproj" />
+  </Folder>
+</Solution>
