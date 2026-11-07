@@ -14,10 +14,10 @@ The consequence is stated plainly: until the pipeline runs and a release is depl
 
 | Stage | State | Evidence |
 | --- | --- | --- |
-| 1. Repository and foundation | Complete locally, first remote CI run pending | Solution builds in Release; 128 tests; formatting gate clean |
+| 1. Repository and foundation | Complete | Solution builds in Release; 128 tests; formatting gate clean; first main CI run green |
 | 2. Engineering evidence | Complete and verified locally | Manifest generator, parsers, policy gate, verifier and `/proof` with 105 unit tests |
 | 3. Race Condition Arena | Complete and verified locally | 23 PostgreSQL integration tests, including 50 concurrent transfers under both strategies |
-| 4. Attestation and deployment | Implemented, execution blocked | Pinned workflow, attestation steps, Fly Machines API probe, digest comparison, deploy job |
+| 4. Attestation and deployment | Attestation complete, deployment blocked | SLSA provenance and quality attestation published and verified; Fly deploy gated off pending approval |
 | 5. Code tour and release | Documentation complete, public release pending | README, six ADRs, interactive code tour, PROJECT_STATUS |
 
 ## Verified locally
