@@ -1,5 +1,7 @@
 # Break Me If You Can
 
+[![CI](https://github.com/Just4Skii/break-me-if-you-can/actions/workflows/ci.yml/badge.svg)](https://github.com/Just4Skii/break-me-if-you-can/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-e3a84e.svg)](LICENSE)
+
 An interactive engineering proof lab. Verify a release from four independent sources, then put the ledger under real concurrent load and watch the database hold.
 
 This is not a dashboard mock-up. The numbers on the proof page are produced by the CI run for the commit that is actually deployed, and the arena executes real PostgreSQL transactions against real rows.
@@ -16,6 +18,44 @@ This is not a dashboard mock-up. The numbers on the proof page are produced by t
 6. **Open `/tour`.** Every claim links to the file that implements it, pinned to the deployed commit. The architecture, schema, transaction and pipeline diagrams are generated from the same code you just exercised.
 
 That is the whole product: evidence, an experiment, and the map to the code.
+
+---
+
+## First release evidence
+
+This repository has produced one successful release run. These are the actual values, not a template.
+
+| Field | Value |
+| --- | --- |
+| Commit | `e5b4edf6f1d13cf4f715d3739fa578c3c8a3f971` |
+| Workflow run | https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42367193984 |
+| Image | `ghcr.io/just4skii/break-me-if-you-can` |
+| Digest | `sha256:b644fd7b012876d94a5a59f7eb27b88017effab0e89910b4e20118014d60f5c9` |
+| Attestations | 2 (SLSA build provenance and the custom quality predicate) |
+| Tests | 128 / 128 passed |
+| Coverage | 86.94% line / 73.5% branch (gate 75%) |
+| Dependency audit | no known advisories |
+| Deployment | **not deployed**: `DEPLOY_ENABLED` is unset and no Fly machine exists |
+
+The proof endpoint was run locally against that exact evidence artifact and the live GitHub attestations API. It reports **UNKNOWN** — 14 of 19 required checks verified — because the requested and observed deployment digests do not exist until a deploy. That is the intended behaviour: the build and its provenance are proven, the runtime is not observed, so the release is not verified.
+
+~~~
+$ curl -s -H 'Accept: application/json' http://localhost:5099/api/proof | jq '{state, summary, built: .image.builtDigest, attested: .image.attestedDigest}'
+{
+  "state": "unknown",
+  "summary": "5 of 19 required checks cannot be verified. Missing evidence is reported as UNKNOWN, never as a pass.",
+  "built": "sha256:b644fd7b012876d94a5a59f7eb27b88017effab0e89910b4e20118014d60f5c9",
+  "attested": "sha256:b644fd7b012876d94a5a59f7eb27b88017effab0e89910b4e20118014d60f5c9"
+}
+~~~
+
+The verification command published by that run is:
+
+~~~bash
+gh attestation verify oci://ghcr.io/just4skii/break-me-if-you-can@sha256:b644fd7b012876d94a5a59f7eb27b88017effab0e89910b4e20118014d60f5c9 \
+  --repo Just4Skii/break-me-if-you-can \
+  --predicate-type https://slsa.dev/provenance/v1
+~~~
 
 ---
 
@@ -337,14 +377,14 @@ Verified locally:
 
 - Release build with warnings as errors and a formatting gate.
 - 128 automated tests (105 unit, 23 PostgreSQL integration) all passing.
-- Coverage above the 75% gate.
+- Coverage 86.94% line / 73.5% branch against the 75% gate.
 - A clean NuGet advisory audit.
 - A Docker image build of the API plus the React bundle.
 - `actionlint` clean on the workflow.
 
 Not yet verified, and therefore not claimed:
 
-- A GitHub Actions run (the repository must be created and pushed).
+- A GitHub Actions run: the first main run completed successfully (quality, image, attestation and evidence).
 - A Fly.io deployment, running image digest and live attestation (requires paid infrastructure and secrets).
 - The `gh attestation verify` command against a real published image.
 
