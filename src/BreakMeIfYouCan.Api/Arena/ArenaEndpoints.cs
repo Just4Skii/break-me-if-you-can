@@ -183,7 +183,7 @@ public static class ArenaEndpoints
                 FailureReason = t.FailureReason,
                 CreatedAt = t.CreatedAt,
                 Entries = t.Entries
-                    .OrderBy(e => e.Direction, StringComparer.Ordinal)
+                    .OrderBy(e => e.Direction == LedgerDirections.Debit ? 0 : 1)
                     .Select(e => new LedgerEntryView
                     {
                         Direction = e.Direction,

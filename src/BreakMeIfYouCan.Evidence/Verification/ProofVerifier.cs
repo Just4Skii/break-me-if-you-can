@@ -348,7 +348,7 @@ public sealed class ProofVerifier
                 "attestation.independent",
                 "Attestation queried from GitHub",
                 "The GitHub attestations API could not be queried" +
-                (string.IsNullOrWhiteSpace(attestation?.Failure) ? "." : ": " + attestation.Failure + ".")));
+                (string.IsNullOrWhiteSpace(attestation?.Failure) ? "." : ": " + Punctuate(attestation.Failure))));
         }
         else if (!attestation.Found)
         {
@@ -410,7 +410,7 @@ public sealed class ProofVerifier
                 "deployment.health",
                 "Deployment health",
                 "The runtime platform could not be queried" +
-                (string.IsNullOrWhiteSpace(runtime?.Failure) ? "." : ": " + runtime.Failure + ".")));
+                (string.IsNullOrWhiteSpace(runtime?.Failure) ? "." : ": " + Punctuate(runtime.Failure))));
         }
         else if (runtime.Healthy == false)
         {
@@ -450,8 +450,8 @@ public sealed class ProofVerifier
                 failedChecks.Count + " of " + required.Count + " required checks failed: " +
                 string.Join(", ", failedChecks.Select(c => c.Label)) + ".",
             _ =>
-                unknownChecks.Count + " of " + required.Count + " required checks cannot be verified: " +
-                string.Join(", ", unknownChecks.Select(c => c.Label)) + ".",
+                unknownChecks.Count + " of " + required.Count +
+                " required checks cannot be verified. Missing evidence is reported as UNKNOWN, never as a pass.",
         };
 
         var verifyCommand = evidence?.Attestations.BuildProvenance.Command;
@@ -662,6 +662,9 @@ public sealed class ProofVerifier
 
     private static ProofCheck Unknown(string id, string label, string detail) =>
         new() { Id = id, Label = label, State = EvidenceState.Unknown, Detail = detail };
+
+    private static string Punctuate(string value) =>
+        value.Length > 0 && value[^1] is '.' or '!' or '?' ? value : value + ".";
 
     private static string Short(string? sha) =>
         string.IsNullOrWhiteSpace(sha) ? "unknown" : sha.Length <= 12 ? sha : sha[..12];

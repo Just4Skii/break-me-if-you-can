@@ -21,6 +21,7 @@ builder.Configuration.AddEnvironmentVariables();
 builder.Services.Configure<ArenaOptions>(builder.Configuration.GetSection(ArenaOptions.SectionName));
 builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
 builder.Services.Configure<ProofOptions>(builder.Configuration.GetSection(ProofOptions.SectionName));
+builder.Services.Configure<RuntimeOptions>(builder.Configuration.GetSection(RuntimeOptions.SectionName));
 
 // Resolved lazily so the host configuration (including test and deployment overrides)
 // is final before the provider is configured.
@@ -41,7 +42,14 @@ builder.Services.AddDbContext<ArenaDbContext>((provider, options) =>
     });
 });
 
-builder.Services.AddDataProtection().SetApplicationName("break-me-if-you-can");
+// Keys live in a writable directory so the non-root container user can protect the
+// anonymous sandbox cookie. Keys are per machine; a visitor landing on another machine
+// simply receives a fresh sandbox.
+var keyPath = builder.Configuration["DataProtection:KeysPath"];
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(
+        string.IsNullOrWhiteSpace(keyPath) ? Path.Combine(Path.GetTempPath(), "breakme-dp-keys") : keyPath))
+    .SetApplicationName("break-me-if-you-can");
 
 builder.Services.AddSingleton<CommitInfo>();
 builder.Services.AddSingleton<IRunningBuild>(sp => sp.GetRequiredService<CommitInfo>());
@@ -138,6 +146,33 @@ else
 }
 
 app.UseMiddleware<ArenaExceptionMiddleware>();
+
+var killSwitch = app.Services.GetRequiredService<IOptions<RuntimeOptions>>().Value.KillSwitch;
+if (killSwitch)
+{
+    app.Logger.LogWarning("Runtime kill switch is enabled: arena endpoints will return 503.");
+}
+
+app.Use(async (context, next) =>
+{
+    if (killSwitch && context.Request.Path.StartsWithSegments("/api/arena"))
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.Headers.RetryAfter = "300";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            type = "https://breakmeifyoucan.dev/problems/arena-disabled",
+            title = "The arena is temporarily disabled",
+            status = 503,
+            detail = "An operator has engaged the deployment kill switch. The engineering proof remains available.",
+            instance = context.Request.Path.Value,
+        });
+        return;
+    }
+
+    await next(context);
+});
+
 app.UseRateLimiter();
 
 app.UseDefaultFiles();

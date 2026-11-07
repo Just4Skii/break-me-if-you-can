@@ -152,7 +152,8 @@ public sealed class FlyRuntimeProbe(
     {
         Available = false,
         Failure = failure,
-        ObservedAt = DateTimeOffset.UtcNow,
+        // Nothing was observed, so nothing is timestamped as observed.
+        ObservedAt = null,
         Source = "fly-machines-api",
         SourceUrl = sourceUrl,
     };

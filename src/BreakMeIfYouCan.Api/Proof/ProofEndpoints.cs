@@ -4,8 +4,8 @@ public static class ProofEndpoints
 {
     public static IEndpointRouteBuilder MapProofEndpoints(this IEndpointRouteBuilder app)
     {
-        // Content negotiation keeps a single canonical URL: a browser gets the client,
-        // an API caller gets the evidence document.
+        // The canonical, human-facing URL. A browser navigation receives the client;
+        // an API caller receives the evidence document.
         app.MapGet("/proof", async (
             HttpContext context,
             ProofService proof,
@@ -29,14 +29,34 @@ public static class ProofEndpoints
                 }
             }
 
-            var report = await proof.GetReportAsync(cancellationToken);
-            context.Response.Headers.CacheControl = "no-store";
-            context.Response.Headers["X-Evidence-State"] = report.State.ToString().ToLowerInvariant();
-            return Results.Ok(report);
+            return await WriteReportAsync(context, proof, cancellationToken);
         })
         .WithName("GetEngineeringProof")
         .RequireRateLimiting("proof");
 
+        // Explicit JSON alias used by the client, so a client-side route and an API route
+        // can never resolve to the same path with different expectations.
+        app.MapGet("/api/proof", async (
+            HttpContext context,
+            ProofService proof,
+            CancellationToken cancellationToken) =>
+        {
+            return await WriteReportAsync(context, proof, cancellationToken);
+        })
+        .WithName("GetEngineeringProofJson")
+        .RequireRateLimiting("proof");
+
         return app;
+    }
+
+    private static async Task<IResult> WriteReportAsync(
+        HttpContext context,
+        ProofService proof,
+        CancellationToken cancellationToken)
+    {
+        var report = await proof.GetReportAsync(cancellationToken);
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers["X-Evidence-State"] = report.State.ToString().ToLowerInvariant();
+        return Results.Ok(report);
     }
 }

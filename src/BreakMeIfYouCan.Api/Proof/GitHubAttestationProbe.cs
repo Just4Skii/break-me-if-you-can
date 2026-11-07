@@ -130,7 +130,7 @@ public sealed class GitHubAttestationProbe(
     {
         Available = false,
         Failure = failure,
-        ObservedAt = DateTimeOffset.UtcNow,
+        ObservedAt = null,
         Source = "github-attestations-api",
     };
 }

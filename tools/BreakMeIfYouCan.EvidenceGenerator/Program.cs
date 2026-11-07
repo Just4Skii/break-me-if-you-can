@@ -29,6 +29,7 @@ internal static class Program
           --coverage-threshold <double> Minimum line coverage percentage (default 75).
           --expected-assemblies <list>  Comma separated test assemblies whose TRX is required.
           --enforce                     Exit with code 2 when release policy is violated.
+          --check <manifest>            Evaluate release policy for an existing manifest.
           --help                        Show this message.
         """;
 
@@ -60,6 +61,14 @@ internal static class Program
         }
 
         var options = Parse(args);
+
+        // Policy-only mode: the workflow writes the manifest first, uploads it, and then
+        // asks whether it satisfies the release policy. The check never re-generates.
+        var checkPath = options.Value("--check");
+        if (!string.IsNullOrWhiteSpace(checkPath))
+        {
+            return CheckExisting(checkPath);
+        }
 
         var contextPath = options.GetRequired("--context");
         var outputPath = options.GetRequired("--output");
@@ -130,6 +139,32 @@ internal static class Program
         }
 
         return options.Has("--enforce") ? 2 : 0;
+    }
+
+    private static int CheckExisting(string path)
+    {
+        if (!File.Exists(path))
+        {
+            Console.Error.WriteLine("error: manifest not found: " + path);
+            return 1;
+        }
+
+        var manifest = EvidenceManifestFile.Read(path);
+        var violations = EvidencePolicy.Evaluate(manifest);
+
+        if (violations.Count == 0)
+        {
+            Console.WriteLine("policy      : satisfied (" + path + ")");
+            return 0;
+        }
+
+        Console.Error.WriteLine("policy      : " + violations.Count + " violation(s)");
+        foreach (var violation in violations)
+        {
+            Console.Error.WriteLine("  [" + violation.Id + "] " + violation.Detail);
+        }
+
+        return 2;
     }
 
     private static string? Format(double? value) =>
