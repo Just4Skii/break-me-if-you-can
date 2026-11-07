@@ -114,7 +114,7 @@ quality ──► image ──► attest ──► evidence ──► deploy
 7. Record the deployment intent as an artifact.
 8. Query the Fly Machines API and **fail the run** if the running digest differs from the requested one.
 
-Pull requests never reach the image, attestation or deployment jobs. The dependency-review job only runs on pull requests.
+Pull requests never reach the image, attestation or deployment jobs. The separate dependency-review check is opt-in (`DEPENDENCY_REVIEW_ENABLED=true`) because it requires the repository dependency graph; the NuGet audit in the quality gate runs regardless.
 
 ### Pinned GitHub Actions
 

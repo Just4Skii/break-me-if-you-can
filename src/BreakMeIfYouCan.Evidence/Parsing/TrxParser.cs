@@ -114,7 +114,9 @@ public static class TrxParser
                 continue;
             }
 
-            var name = Path.GetFileNameWithoutExtension(storage);
+            // TRX stores Windows-style paths even when the report was produced on Linux,
+            // so normalise separators before deriving the assembly name.
+            var name = Path.GetFileNameWithoutExtension(storage.Replace('\\', '/'));
             if (!string.IsNullOrWhiteSpace(name))
             {
                 map[id] = name;

@@ -654,7 +654,9 @@ jobs:
   # ---------------------------------------------------------------------------
   dependency-review:
     name: Dependency review
-    if: github.event_name == 'pull_request'
+    # The review action needs the repository dependency graph. It stays opt-in so a
+    # new repository does not fail every pull request on a repository setting.
+    if: github.event_name == 'pull_request' && vars.DEPENDENCY_REVIEW_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
