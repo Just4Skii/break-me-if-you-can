@@ -14,7 +14,7 @@ Compare four digests:
 1. **Built** — the digest emitted by the image build job.
 2. **Attested** — the subject digest recorded in the GitHub attestation.
 3. **Requested** — the digest recorded in the deployment intent artifact by the deploy job.
-4. **Observed** — the digest reported by the Fly Machines API for the running machine.
+4. **Observed** — the digest reported by the Fly Machines API in `image_ref.digest` for the running machine (`config.image` is the request and is never used as evidence).
 
 Every adjacent pair is compared. `VERIFIED` requires all four to be present and identical, plus an attestation that validates against the expected repository, commit and workflow.
 

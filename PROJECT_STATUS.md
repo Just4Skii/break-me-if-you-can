@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-07
 Branch: `main`
-Repository: `Just4Skii/break-me-if-you-can` (creation and first CI run pending at the time of writing)
+Repository: `Just4Skii/break-me-if-you-can`
 
 ## Summary
 
@@ -14,11 +14,11 @@ The consequence is stated plainly: until the pipeline runs and a release is depl
 
 | Stage | State | Evidence |
 | --- | --- | --- |
-| 1. Repository and foundation | Complete | Solution builds in Release; 128 tests; formatting gate clean; first main CI run green |
+| 1. Repository and foundation | Complete | Solution builds in Release; 149 tests; formatting gate clean; main CI runs green |
 | 2. Engineering evidence | Complete and verified locally | Manifest generator, parsers, policy gate, verifier and `/proof` with 105 unit tests |
 | 3. Race Condition Arena | Complete and verified locally | 23 PostgreSQL integration tests, including 50 concurrent transfers under both strategies |
 | 4. Attestation and deployment | Attestation complete, deployment blocked | SLSA provenance and quality attestation published and verified; Fly deploy gated off pending approval |
-| 5. Code tour and release | Documentation and design QA complete, public release pending | README, six ADRs, interactive code tour, design QA pass recorded in .design/memory.md |
+| 5. Code tour and release | Documentation, design QA and security review complete; public release pending | README, seven ADRs, security review, acceptance criteria, interactive code tour |
 
 ## Remote verification (GitHub Actions)
 
@@ -27,6 +27,7 @@ The consequence is stated plainly: until the pipeline runs and a release is depl
 | [42367193984](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42367193984) | `e5b4edf6` | success — quality, image, attestation and evidence jobs |
 | [42367956265](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42367956265) | `354c30fc` | success — release evidence documentation |
 | [42368969420](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42368969420) | `d46c7d9a` | success — includes the design-QA client build in the quality gate |
+| [42369465155](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42369465155) | `59be9373` | success — latest release evidence before the runtime-verification correction |
 
 The quality job now type-checks and builds the React client as well as the .NET solution. The image, attestation and evidence jobs ran on every main push listed above; deployment remains skipped by design.
 
@@ -83,6 +84,12 @@ The runtime needs two read-only tokens to reach the independent sources:
 - `Proof__Fly__ApiToken` — read-only for the Machines API.
 
 Without them the proof degrades to `UNKNOWN` by design. They are documented in the README and are never committed.
+
+## Security and acceptance review
+
+- [docs/security-review.md](docs/security-review.md) records the threat model, twelve findings, residual risks and the reliability review. It is a self-review, not a penetration test.
+- [docs/acceptance-criteria.md](docs/acceptance-criteria.md) maps all fourteen acceptance criteria to evidence. Criterion 7 (independently verified runtime digest) is explicitly marked as not demonstrated until a deployment exists.
+- [docs/deployment-verification.md](docs/deployment-verification.md) records the verified Johannesburg region and Machines API shape.
 
 ## Known gaps
 

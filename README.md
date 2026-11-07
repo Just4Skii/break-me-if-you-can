@@ -21,41 +21,43 @@ That is the whole product: evidence, an experiment, and the map to the code.
 
 ---
 
-## First release evidence
+## Latest release evidence
 
-This repository has produced one successful release run. These are the actual values, not a template.
+The latest successful release run produced these values. They are copied from the run, not from a template.
 
 | Field | Value |
 | --- | --- |
-| Commit | `e5b4edf6f1d13cf4f715d3739fa578c3c8a3f971` |
-| Workflow run | https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42367193984 |
+| Commit | `59be9373c88930317ce9e7781aba202f89ba90a7` |
+| Workflow run | https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42369465155 |
 | Image | `ghcr.io/just4skii/break-me-if-you-can` |
-| Digest | `sha256:b644fd7b012876d94a5a59f7eb27b88017effab0e89910b4e20118014d60f5c9` |
+| Digest | `sha256:9f51dbd17b2af84ed82ae1dd419ea1eb9583d0976de2b6f2aa6c620bcfa3bb6f` |
 | Attestations | 2 (SLSA build provenance and the custom quality predicate) |
-| Tests | 128 / 128 passed |
+| Tests | 128 / 128 passed at that commit |
 | Coverage | 86.94% line / 73.5% branch (gate 75%) |
 | Dependency audit | no known advisories |
 | Deployment | **not deployed**: `DEPLOY_ENABLED` is unset and no Fly machine exists |
 
-The proof endpoint was run locally against that exact evidence artifact and the live GitHub attestations API. It reports **UNKNOWN** — 14 of 19 required checks verified — because the requested and observed deployment digests do not exist until a deploy. That is the intended behaviour: the build and its provenance are proven, the runtime is not observed, so the release is not verified.
+The proof endpoint was run locally against that exact evidence artifact and the live GitHub attestations API. It reports **UNKNOWN** — 14 of 20 required checks verified — because the requested and observed deployment digests, and the runtime repository, do not exist until a deploy. That is the intended behaviour: the build and its provenance are proven, the runtime is not observed, so the release is not verified.
 
-~~~
+The runtime-verification correction described in `docs/deployment-verification.md` adds 21 tests; the suite is now 149 (126 unit, 23 integration).
+
+```
 $ curl -s -H 'Accept: application/json' http://localhost:5099/api/proof | jq '{state, summary, built: .image.builtDigest, attested: .image.attestedDigest}'
 {
   "state": "unknown",
-  "summary": "5 of 19 required checks cannot be verified. Missing evidence is reported as UNKNOWN, never as a pass.",
-  "built": "sha256:b644fd7b012876d94a5a59f7eb27b88017effab0e89910b4e20118014d60f5c9",
-  "attested": "sha256:b644fd7b012876d94a5a59f7eb27b88017effab0e89910b4e20118014d60f5c9"
+  "summary": "6 of 20 required checks cannot be verified. Missing evidence is reported as UNKNOWN, never as a pass.",
+  "built": "sha256:9f51dbd17b2af84ed82ae1dd419ea1eb9583d0976de2b6f2aa6c620bcfa3bb6f",
+  "attested": "sha256:9f51dbd17b2af84ed82ae1dd419ea1eb9583d0976de2b6f2aa6c620bcfa3bb6f"
 }
-~~~
+```
 
 The verification command published by that run is:
 
-~~~bash
-gh attestation verify oci://ghcr.io/just4skii/break-me-if-you-can@sha256:b644fd7b012876d94a5a59f7eb27b88017effab0e89910b4e20118014d60f5c9 \
+```bash
+gh attestation verify oci://ghcr.io/just4skii/break-me-if-you-can@sha256:9f51dbd17b2af84ed82ae1dd419ea1eb9583d0976de2b6f2aa6c620bcfa3bb6f \
   --repo Just4Skii/break-me-if-you-can \
   --predicate-type https://slsa.dev/provenance/v1
-~~~
+```
 
 ---
 
@@ -85,7 +87,7 @@ The initial release deliberately contains exactly these three experiences. Mutat
 | --- | --- | --- |
 | CI evidence manifest | `ci-evidence.json` with tests, coverage, audit, build and image digest | Downloaded from the **GitHub Actions artifact** of the run discovered by the running commit |
 | Deployment intent | The digest the deploy job asked Fly to run | `deployment-intent` artifact from the same workflow run |
-| Running image | The digest the platform actually runs | **Fly Machines API** `GET /v1/apps/{app}/machines`, authenticated with a read-only token |
+| Running image | The digest the platform actually runs | **Fly Machines API** `GET /v1/apps/{app}/machines`, reading `image_ref.digest`, authenticated with a read-only token |
 | Attestation | Provenance and the custom quality predicate | **GitHub attestations API** for the digest, queried on every request (not trusted from the manifest) |
 
 The commit is compiled into the assembly at build time (`AssemblyMetadata("CommitSha")`). It is **not** read from an environment variable: an operator could set an environment variable to match the evidence, which would make the whole exercise meaningless.
@@ -287,7 +289,7 @@ flyctl deploy --app break-me-if-you-can \
   --strategy rolling --wait-timeout 300 --yes
 ```
 
-It then reads `https://api.machines.dev/v1/apps/break-me-if-you-can/machines` and fails if the started machine's `config.image` does not contain the requested digest.
+It then reads `https://api.machines.dev/v1/apps/break-me-if-you-can/machines` and fails unless every started machine reports the expected `image_ref` registry, repository and exact digest. `config.image` is never read. See [docs/deployment-verification.md](docs/deployment-verification.md).
 
 ### Required secrets
 
@@ -331,6 +333,8 @@ Implemented:
 - NuGet advisory audit on every quality run.
 - No visitor code execution and no per-visitor containers.
 
+The full findings, residual risks and reliability notes are in [docs/security-review.md](docs/security-review.md). The [acceptance criteria](docs/acceptance-criteria.md) map every mandate requirement to its evidence.
+
 Not assessed:
 
 - Penetration testing and adversarial runtime exploitation.
@@ -370,6 +374,7 @@ docs/adr/                                 architecture decision records
 | [004](docs/adr/004-four-digest-verification.md) | Four digests from four independent sources |
 | [005](docs/adr/005-evidence-from-artifacts.md) | Evidence is fetched from the Actions artifacts, not baked into the image |
 | [006](docs/adr/006-anonymous-sandboxes.md) | Anonymous sandboxes; reset archives instead of rewriting history |
+| [007](docs/adr/007-pinned-dependencies.md) | The NuGet graph and the container base images are pinned |
 
 ---
 
@@ -378,10 +383,12 @@ docs/adr/                                 architecture decision records
 Verified locally:
 
 - Release build with warnings as errors and a formatting gate.
-- 128 automated tests (105 unit, 23 PostgreSQL integration) all passing.
+- 149 automated tests (126 unit, 23 PostgreSQL integration) all passing; the last release run recorded 128 before the runtime-verification correction.
 - Coverage 86.94% line / 73.5% branch against the 75% gate.
 - A clean NuGet advisory audit.
 - A Docker image build of the API plus the React bundle.
+- NuGet restore with `--locked-mode` from committed `packages.lock.json` files; base images pinned by digest.
+- A container build from the pinned Dockerfile.
 - `actionlint` clean on the workflow.
 
 Not yet verified, and therefore not claimed:
