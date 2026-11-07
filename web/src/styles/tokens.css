@@ -1,0 +1,55 @@
+:root {
+  color-scheme: dark;
+
+  /* Ground: warm-neutral near-black, not blue-slate. */
+  --bg: #0b0c0e;
+  --bg-raised: #111316;
+  --bg-raised-2: #171a1e;
+
+  --line: #262a30;
+  --line-strong: #3a3f47;
+
+  --ink: #ece8e1;
+  --ink-2: #b9b3a9;
+  --ink-3: #8a857c;
+
+  /* Amber is the instrument's signal: verified, focus, primary action. */
+  --amber: #e3a84e;
+  --amber-bright: #f2bd66;
+  --amber-soft: rgba(227, 168, 78, 0.12);
+
+  /* Vermillion is failure only. Never decorative. */
+  --vermillion: #e2564a;
+  --vermillion-soft: rgba(226, 86, 74, 0.12);
+
+  /* Stone is the colour of not knowing. Deliberately not green. */
+  --stone: #8e8b85;
+  --stone-soft: rgba(142, 139, 133, 0.12);
+
+  /* Steel is a data series colour, not a status. */
+  --steel: #7fa3b8;
+
+  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  --radius-1: 2px;
+  --radius-2: 4px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+
+  --content-max: 1240px;
+  --rail-width: 232px;
+}
