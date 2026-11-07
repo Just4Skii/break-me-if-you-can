@@ -21,9 +21,9 @@ That is the whole product: evidence, an experiment, and the map to the code.
 
 ---
 
-## Latest release evidence
+## Release evidence
 
-The latest successful release run produced these values. They are copied from the run, not from a template.
+The release run at commit `59be9373` produced these values. They are copied from the run, not from a template.
 
 | Field | Value |
 | --- | --- |
@@ -39,7 +39,7 @@ The latest successful release run produced these values. They are copied from th
 
 The proof endpoint was run locally against that exact evidence artifact and the live GitHub attestations API. It reports **UNKNOWN** — 14 of 20 required checks verified — because the requested and observed deployment digests, and the runtime repository, do not exist until a deploy. That is the intended behaviour: the build and its provenance are proven, the runtime is not observed, so the release is not verified.
 
-The runtime-verification correction described in `docs/deployment-verification.md` adds 21 tests; the suite is now 149 (126 unit, 23 integration).
+The runtime-verification correction described in `docs/deployment-verification.md` adds 21 tests; the suite is now 149 (126 unit, 23 integration), verified by the correction's pull-request run [42371375446](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42371375446).
 
 ```
 $ curl -s -H 'Accept: application/json' http://localhost:5099/api/proof | jq '{state, summary, built: .image.builtDigest, attested: .image.attestedDigest}'
