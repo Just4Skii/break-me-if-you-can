@@ -568,6 +568,7 @@ public sealed class ProofVerifier
                 MachineCreatedAt = runtime?.MachineCreatedAt,
                 AppName = runtime?.AppName,
                 MachineId = runtime?.MachineId,
+                MachineCount = runtime?.MachineCount,
                 Region = runtime?.Region,
                 Source = runtime?.Source ?? "unknown",
                 SourceUrl = runtime?.SourceUrl,
