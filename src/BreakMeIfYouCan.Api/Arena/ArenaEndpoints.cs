@@ -45,7 +45,7 @@ public static class ArenaEndpoints
     {
         var visitor = cookie.Resolve(context);
         var session = await sandboxes.GetOrCreateAsync(visitor, cancellationToken);
-        return Results.Ok(ToView(session, options.Value));
+        return Results.Ok(ToView(session, options.Value, cookie.Protect(visitor)));
     }
 
     private static async Task<IResult> Reset(
@@ -62,7 +62,7 @@ public static class ArenaEndpoints
 
         var visitor = cookie.Resolve(context);
         var session = await sandboxes.ResetAsync(visitor, cancellationToken);
-        return Results.Ok(ToView(session, options.Value));
+        return Results.Ok(ToView(session, options.Value, cookie.Protect(visitor)));
     }
 
     private static async Task<IResult> Transfer(
@@ -196,7 +196,7 @@ public static class ArenaEndpoints
         });
     }
 
-    private static SandboxView ToView(SandboxSession session, ArenaOptions options)
+    private static SandboxView ToView(SandboxSession session, ArenaOptions options, string? sandboxToken = null)
     {
         var scenario = ArenaScenarioKeys.StarterScenario;
         return new SandboxView
@@ -222,6 +222,7 @@ public static class ArenaEndpoints
                 MaxRetryAttempts = options.MaxRetryAttempts,
             },
             CreatedAt = session.Sandbox.CreatedAt,
+            SandboxToken = sandboxToken,
         };
     }
 }

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="robots" content="noindex" />
+    <title>Break Me If You Can</title>
+    <script>
+      // Project-site fallback: /break-me-if-you-can/proof becomes /break-me-if-you-can/?/proof,
+      // which the application shell turns back into the clean route.
+      ;(function () {
+        var segments = window.location.pathname.split('/').filter(Boolean)
+        var base = segments.length > 0 ? '/' + segments[0] + '/' : '/'
+        var route = window.location.pathname.slice(base.length)
+        window.location.replace(base + '?/' + route + window.location.search)
+      })()
+    </script>
+  </head>
+  <body></body>
+</html>

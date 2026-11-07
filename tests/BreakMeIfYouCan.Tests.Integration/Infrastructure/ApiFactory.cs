@@ -28,6 +28,8 @@ public sealed class ApiFactory(
                 ["Arena:BackoffMaxMilliseconds"] = "200",
                 ["Arena:MaxConcurrentRuns"] = "4",
                 ["Logging:LogLevel:Default"] = "Warning",
+                ["Cors:AllowedOrigins:0"] = "https://just4skii.github.io",
+                ["Cors:AllowedOrigins:1"] = "http://localhost:5173",
             });
 
             if (extraConfiguration is not null)

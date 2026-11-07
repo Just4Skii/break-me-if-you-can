@@ -175,6 +175,7 @@ export interface ArenaLimits {
 
 export interface SandboxView {
   sandboxId: string
+  sandboxToken?: string
   scenarioKey: string
   scenarioName: string
   scenarioDescription: string

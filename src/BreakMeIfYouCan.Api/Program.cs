@@ -22,6 +22,7 @@ builder.Services.Configure<ArenaOptions>(builder.Configuration.GetSection(ArenaO
 builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
 builder.Services.Configure<ProofOptions>(builder.Configuration.GetSection(ProofOptions.SectionName));
 builder.Services.Configure<RuntimeOptions>(builder.Configuration.GetSection(RuntimeOptions.SectionName));
+builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
 
 // Resolved lazily so the host configuration (including test and deployment overrides)
 // is final before the provider is configured.
@@ -103,6 +104,29 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
+// The client can be served from a different origin (GitHub Pages). The sandbox identity
+// travels in an X-Sandbox-Token header, so no cross-site cookie is required.
+var allowedOrigins = builder.Configuration
+    .GetSection(CorsOptions.SectionName)
+    .GetSection(nameof(CorsOptions.AllowedOrigins))
+    .Get<string[]>() ?? [];
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("frontend", policy =>
+    {
+        policy.AllowAnyHeader().AllowAnyMethod();
+
+        if (allowedOrigins.Length == 0)
+        {
+            policy.SetIsOriginAllowed(_ => false);
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins);
+        }
+    });
+});
+
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks()
     .AddCheck<SelfHealthCheck>("process", tags: ["live"])
@@ -121,6 +145,10 @@ if (!builder.Environment.IsDevelopment())
 }
 
 var app = builder.Build();
+
+app.Logger.LogInformation(
+    "CORS allowed origins: {Origins}",
+    allowedOrigins.Length == 0 ? "(none)" : string.Join(", ", allowedOrigins));
 
 if (string.IsNullOrWhiteSpace(app.Configuration.GetConnectionString("Postgres")))
 {
@@ -146,6 +174,10 @@ else
 }
 
 app.UseMiddleware<ArenaExceptionMiddleware>();
+
+// CORS must run before rate limiting: preflight requests are answered here and must not
+// consume a visitor's rate-limit budget.
+app.UseCors("frontend");
 
 var killSwitch = app.Services.GetRequiredService<IOptions<RuntimeOptions>>().Value.KillSwitch;
 if (killSwitch)
@@ -223,7 +255,7 @@ app.Run();
 static string VisitorPartition(HttpContext context)
 {
     var cookie = context.RequestServices.GetRequiredService<VisitorCookie>();
-    return cookie.Resolve(context).ToString("N");
+    return cookie.TryResolve(context, out var visitor) ? visitor.ToString("N") : IpPartition(context);
 }
 
 static string IpPartition(HttpContext context) =>

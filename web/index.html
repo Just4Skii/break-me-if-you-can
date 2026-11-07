@@ -10,6 +10,18 @@
       content="Break Me If You Can — an interactive engineering proof lab. Verify the release, then put the ledger under concurrent load."
     />
     <title>Break Me If You Can</title>
+    <script>
+      // GitHub Pages serves 404.html for unknown paths. The 404 page redirects here as
+      // /?/route, and this restores the clean URL before React Router runs.
+      ;(function () {
+        var search = window.location.search
+        if (search.length > 1 && search.charAt(1) === '/') {
+          var pathname = window.location.pathname
+          var base = pathname.charAt(pathname.length - 1) === '/' ? pathname : pathname + '/'
+          window.history.replaceState(null, '', base + search.slice(2))
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

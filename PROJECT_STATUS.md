@@ -14,9 +14,9 @@ The consequence is stated plainly: until the pipeline runs and a release is depl
 
 | Stage | State | Evidence |
 | --- | --- | --- |
-| 1. Repository and foundation | Complete | Solution builds in Release; 149 tests; formatting gate clean; main CI runs green |
-| 2. Engineering evidence | Complete and verified locally | Manifest generator, parsers, policy gate, verifier and `/proof` with 105 unit tests |
-| 3. Race Condition Arena | Complete and verified locally | 23 PostgreSQL integration tests, including 50 concurrent transfers under both strategies |
+| 1. Repository and foundation | Complete | Solution builds in Release; 151 tests; formatting gate clean; main CI runs green |
+| 2. Engineering evidence | Complete and verified locally | Manifest generator, parsers, policy gate, verifier and `/proof` with 126 unit tests |
+| 3. Race Condition Arena | Complete and verified locally | 25 PostgreSQL integration tests, including 50 concurrent transfers and cross-origin identity |
 | 4. Attestation and deployment | Attestation complete, deployment blocked | SLSA provenance and quality attestation published and verified; Fly deploy gated off pending approval |
 | 5. Code tour and release | Documentation, design QA and security review complete; public release pending | README, seven ADRs, security review, acceptance criteria, interactive code tour |
 
@@ -107,3 +107,15 @@ Without them the proof degrades to `UNKNOWN` by design. They are documented in t
 4. Provision Fly (approval required) and configure the four secrets; run the deploy job.
 5. Open `/proof` on the deployed URL and confirm `VERIFIED`, then run the exposed `gh attestation verify` command independently.
 6. Record the live run and image URLs in the README.
+
+## Hosting track (GitHub Pages + Supabase)
+
+| Item | State | Evidence |
+| --- | --- | --- |
+| GitHub Pages client | Workflow added; deployment pending merge | `.github/workflows/pages.yml`; project-path build verified locally; SPA 404 fallback present |
+| Supabase PostgreSQL | Connected and migrated | `aws-1-eu-central-1` session pooler; five arena tables, constraints and trigger; a real 10-transfer pessimistic run returned a balanced ledger |
+| Cross-origin API | Implemented and tested | `X-Sandbox-Token` identity, CORS allowlist for the Pages origin, preflight test and a no-cookie sandbox test; 151 tests total |
+| API host | Blocked on account/approval | No Render, Cloud Run, Azure or Fly credentials exist in this environment; no API host has been provisioned |
+| Fully usable demo | Not yet | The Pages client shows a static-preview notice until `API_BASE_URL` points at a live API. No result is fabricated while it is absent. |
+
+The Supabase password, publishable/secret keys and service-role key were supplied at runtime and are deliberately not committed. The database connection string is kept in the gitignored `.env.supabase` for local verification only.

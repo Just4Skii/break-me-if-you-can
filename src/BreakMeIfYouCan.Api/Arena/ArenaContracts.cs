@@ -41,6 +41,13 @@ public sealed record SandboxView
     public required ArenaLimits Limits { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>
+    /// Protected visitor token for cross-origin clients. The cookie remains the primary
+    /// identity for same-origin deployments; the client sends this value in
+    /// X-Sandbox-Token when it cannot use a third-party cookie.
+    /// </summary>
+    public string? SandboxToken { get; init; }
 }
 
 public sealed record TransferRequest

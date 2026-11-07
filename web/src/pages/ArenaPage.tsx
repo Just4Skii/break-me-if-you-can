@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError, postJson } from '../api'
 import { useApi } from '../hooks/useApi'
 import type {
@@ -9,6 +9,7 @@ import type {
 } from '../types'
 import { formatDurationMs, formatNumber, formatTimestamp, formatZar, shortSha } from '../format'
 import { CheckIcon, CrossIcon, PlayIcon, RefreshIcon } from '../components/Icons'
+import { setSandboxToken } from '../session'
 import { SectionHead } from '../components/SectionHead'
 
 type Strategy = 'optimistic' | 'pessimistic'
@@ -44,6 +45,13 @@ export function ArenaPage() {
   const [showAllReceipts, setShowAllReceipts] = useState(false)
 
   const limits = session.status === 'success' ? session.data.limits : undefined
+  const sessionToken = session.status === 'success' ? session.data.sandboxToken : undefined
+
+  useEffect(() => {
+    if (sessionToken) {
+      setSandboxToken(sessionToken)
+    }
+  }, [sessionToken])
 
   const update = (patch: Partial<FormState>) => setForm((current) => ({ ...current, ...patch }))
 
@@ -78,7 +86,8 @@ export function ArenaPage() {
     setError(null)
 
     try {
-      await postJson<SandboxView>('/api/arena/reset', {})
+      const resetSession = await postJson<SandboxView>('/api/arena/reset', {})
+      setSandboxToken(resetSession.sandboxToken)
       session.reload()
       setResult(null)
       setHistory({})
