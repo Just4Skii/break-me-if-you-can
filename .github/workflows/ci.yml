@@ -1,0 +1,672 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: 10.0.x
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  COVERAGE_THRESHOLD: "75"
+  FLY_APP: ${{ vars.FLY_APP || 'break-me-if-you-can' }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Quality gate. Everything downstream depends on this job.
+  # ---------------------------------------------------------------------------
+  quality:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: breakme
+          POSTGRES_PASSWORD: breakme-ci-ephemeral
+          POSTGRES_DB: breakme
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U breakme -d breakme"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_POSTGRES: Host=localhost;Port=5432;Database=breakme;Username=breakme;Password=breakme-ci-ephemeral
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore BreakMeIfYouCan.slnx
+
+      - name: Verify formatting
+        run: dotnet format BreakMeIfYouCan.slnx --verify-no-changes --no-restore --verbosity diagnostic
+
+      - name: Build (Release)
+        run: >
+          dotnet build BreakMeIfYouCan.slnx -c Release --no-restore
+          -p:CommitSha=${{ github.sha }}
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Unit tests
+        run: >
+          dotnet test tests/BreakMeIfYouCan.Tests.Unit/BreakMeIfYouCan.Tests.Unit.csproj
+          -c Release --no-build
+          --logger "trx;LogFileName=unit.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory artifacts/test-results
+
+      - name: PostgreSQL integration tests
+        run: >
+          dotnet test tests/BreakMeIfYouCan.Tests.Integration/BreakMeIfYouCan.Tests.Integration.csproj
+          -c Release --no-build
+          --logger "trx;LogFileName=integration.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory artifacts/test-results
+
+      - name: Merge coverage and enforce the 75% line gate
+        run: |
+          set -euo pipefail
+          dotnet tool restore
+          dotnet tool run reportgenerator \
+            -reports:"artifacts/test-results/**/coverage.cobertura.xml" \
+            -targetdir:artifacts/coverage \
+            -reporttypes:"Cobertura;TextSummary" \
+            -assemblyfilters:"+BreakMeIfYouCan.*;-BreakMeIfYouCan.Tests.*" \
+            -classfilters:"-*Migrations*;-*Program*"
+
+          if [ ! -f artifacts/coverage/Summary.txt ]; then
+            echo "::error::Coverage summary was not produced. A missing report is not a passing check."
+            exit 1
+          fi
+
+          LINE=$(grep -E '^  Line coverage:' artifacts/coverage/Summary.txt | grep -oE '[0-9]+(\.[0-9]+)?' | head -1)
+          BRANCH=$(grep -E '^  Branch coverage:' artifacts/coverage/Summary.txt | grep -oE '[0-9]+(\.[0-9]+)?' | head -1)
+
+          if [ -z "${LINE:-}" ]; then
+            echo "::error::Line coverage could not be parsed from Summary.txt."
+            exit 1
+          fi
+
+          {
+            echo "### Coverage"
+            echo ""
+            echo "| Metric | Value | Gate |"
+            echo "| --- | --- | --- |"
+            echo "| Line | ${LINE}% | ≥ ${COVERAGE_THRESHOLD}% |"
+            echo "| Branch | ${BRANCH}% | reported |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          awk -v line="$LINE" -v threshold="$COVERAGE_THRESHOLD" 'BEGIN {
+            if (line + 0 < threshold + 0) {
+              printf "::error::Line coverage %s%% is below the %s%% threshold.\n", line, threshold
+              exit 1
+            }
+          }'
+
+      - name: Audit NuGet dependencies
+        run: |
+          set -uo pipefail
+          mkdir -p artifacts
+          set +e
+          dotnet list package --vulnerable --include-transitive --format json > artifacts/nuget-audit.json
+          AUDIT_EXIT=$?
+          set -e
+          echo "$AUDIT_EXIT" > artifacts/nuget-audit-exit-code.txt
+
+          if [ "$AUDIT_EXIT" -ne 0 ]; then
+            echo "::error::The NuGet audit command failed with exit code $AUDIT_EXIT. A failed audit is not a clean audit."
+            exit 1
+          fi
+
+          if [ ! -s artifacts/nuget-audit.json ]; then
+            echo "::error::The NuGet audit produced no report."
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import json
+          import sys
+
+          report = json.load(open("artifacts/nuget-audit.json"))
+          findings = []
+          for project in report.get("projects", []):
+              for framework in project.get("frameworks", []):
+                  for kind in ("topLevelPackages", "transitivePackages"):
+                      for package in framework.get(kind, []):
+                          for vulnerability in package.get("vulnerabilities", []):
+                              findings.append(
+                                  f"{package.get('id')} {package.get('resolvedVersion')} "
+                                  f"({vulnerability.get('severity')}) {vulnerability.get('advisoryurl', '')}"
+                              )
+
+          if findings:
+              print("::error::Vulnerable NuGet packages were reported:")
+              for finding in findings:
+                  print(f"  {finding}")
+              sys.exit(1)
+
+          print("No known vulnerable NuGet packages were reported.")
+          PY
+
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: quality-reports
+          path: |
+            artifacts/test-results
+            artifacts/coverage
+            artifacts/nuget-audit.json
+            artifacts/nuget-audit-exit-code.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Container image. Only after quality passes, and only for a main push.
+  # ---------------------------------------------------------------------------
+  image:
+    name: Build and push image by digest
+    needs: quality
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      reference: ${{ steps.reference.outputs.value }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Normalise the image reference
+        id: reference
+        run: echo "value=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.reference.outputs.value }}:sha-${{ github.sha }}
+          build-args: |
+            COMMIT_SHA=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=sha-${{ github.sha }}
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Record the image digest
+        run: |
+          {
+            echo "### Image"
+            echo ""
+            echo "`${{ steps.reference.outputs.value }}@${{ steps.build.outputs.digest }}`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Attestations: SLSA build provenance plus the project's own quality predicate.
+  # ---------------------------------------------------------------------------
+  attest:
+    name: Attest and verify the image
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      IMAGE_REFERENCE: ${{ needs.image.outputs.reference }}
+      IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
+      WORKFLOW_REF: ${{ github.repository }}/.github/workflows/ci.yml@${{ github.ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Download quality reports
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: quality-reports
+          path: artifacts/quality
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-name: ${{ needs.image.outputs.reference }}
+          subject-digest: ${{ needs.image.outputs.digest }}
+          push-to-registry: true
+
+      - name: Verify build provenance with the GitHub CLI
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/attestation
+          CHECK="gh attestation verify oci://${IMAGE_REFERENCE}@${IMAGE_DIGEST} --repo ${GITHUB_REPOSITORY} --predicate-type https://slsa.dev/provenance/v1 --format json"
+          echo "$CHECK"
+          eval "$CHECK" > artifacts/attestation/provenance-verification.json
+          echo "$CHECK" > artifacts/attestation/provenance-command.txt
+
+      - name: Build the quality predicate
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+          from datetime import datetime, timezone
+
+          total = passed = failed = skipped = 0
+          for path in glob.glob("artifacts/quality/test-results/**/*.trx", recursive=True):
+              root = ET.parse(path).getroot()
+              for element in root.iter():
+                  if not element.tag.endswith("UnitTestResult"):
+                      continue
+                  total += 1
+                  outcome = element.attrib.get("outcome", "").lower()
+                  if outcome in ("passed", "passedbutrunaborted", "warning"):
+                      passed += 1
+                  elif outcome in ("notexecuted", "inconclusive", "notrunnable", "pending", "disconnected"):
+                      skipped += 1
+                  else:
+                      failed += 1
+
+          summary_path = "artifacts/quality/coverage/Summary.txt"
+          line_percent = branch_percent = None
+          if os.path.exists(summary_path):
+              for line in open(summary_path, encoding="utf-8"):
+                  if line.startswith("  Line coverage:"):
+                      line_percent = float(line.split(":")[1].strip().rstrip("%"))
+                  if line.startswith("  Branch coverage:"):
+                      branch_percent = float(line.split(":")[1].strip().split("%")[0])
+
+          audit_status = "missing"
+          audit_path = "artifacts/quality/nuget-audit.json"
+          if os.path.exists(audit_path):
+              audit_status = "clean"
+              report = json.load(open(audit_path))
+              for project in report.get("projects", []):
+                  for framework in project.get("frameworks", []):
+                      for kind in ("topLevelPackages", "transitivePackages"):
+                          for package in framework.get(kind, []):
+                              if package.get("vulnerabilities"):
+                                  audit_status = "vulnerable"
+
+          predicate = {
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "commitSha": os.environ["GITHUB_SHA"],
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "workflowRef": os.environ["WORKFLOW_REF"],
+              "tests": {"total": total, "passed": passed, "failed": failed, "skipped": skipped},
+              "coverage": {
+                  "linePercent": line_percent,
+                  "branchPercent": branch_percent,
+                  "thresholdPercent": float(os.environ["COVERAGE_THRESHOLD"]),
+              },
+              "dependencyAudit": {"status": audit_status},
+              "generatedAt": datetime.now(timezone.utc).isoformat(),
+          }
+
+          os.makedirs("artifacts/attestation", exist_ok=True)
+          with open("artifacts/attestation/quality-predicate.json", "w", encoding="utf-8") as handle:
+              json.dump(predicate, handle, indent=2)
+          print(json.dumps(predicate, indent=2))
+          PY
+
+      - name: Attest quality evidence
+        uses: actions/attest@ce27ba3b4a9a139d9a20a4a07d69fabb52f1e5bc # v2.4.0
+        with:
+          subject-name: ${{ needs.image.outputs.reference }}
+          subject-digest: ${{ needs.image.outputs.digest }}
+          predicate-type: https://breakmeifyoucan.dev/attestation/quality/v1
+          predicate-path: artifacts/attestation/quality-predicate.json
+          push-to-registry: true
+
+      - name: Verify the quality attestation
+        run: |
+          set -euo pipefail
+          CHECK="gh attestation verify oci://${IMAGE_REFERENCE}@${IMAGE_DIGEST} --repo ${GITHUB_REPOSITORY} --predicate-type https://breakmeifyoucan.dev/attestation/quality/v1 --format json"
+          eval "$CHECK" > artifacts/attestation/quality-verification.json
+          echo "$CHECK" > artifacts/attestation/quality-command.txt
+
+      - name: Record the attestation evidence
+        run: |
+          set -euo pipefail
+          VERIFIED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          PROVENANCE_COMMAND="$(cat artifacts/attestation/provenance-command.txt)"
+          QUALITY_COMMAND="$(cat artifacts/attestation/quality-command.txt)"
+          PROVENANCE_COUNT="$(jq 'length' artifacts/attestation/provenance-verification.json)"
+          QUALITY_COUNT="$(jq 'length' artifacts/attestation/quality-verification.json)"
+
+          jq -n \
+            --arg digest "${IMAGE_DIGEST}" \
+            --arg repo "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg runId "${GITHUB_RUN_ID}" \
+            --arg workflowRef "${WORKFLOW_REF}" \
+            --arg verifiedAt "${VERIFIED_AT}" \
+            --arg provenanceCommand "${PROVENANCE_COMMAND}" \
+            --arg qualityCommand "${QUALITY_COMMAND}" \
+            --argjson provenanceCount "${PROVENANCE_COUNT}" \
+            --argjson qualityCount "${QUALITY_COUNT}" \
+            '{
+              buildProvenance: {
+                status: "success",
+                predicateType: "https://slsa.dev/provenance/v1",
+                subjectDigest: $digest,
+                repository: $repo,
+                commitSha: $sha,
+                workflowRef: $workflowRef,
+                runId: $runId,
+                verifiedAt: $verifiedAt,
+                verifier: "gh attestation verify",
+                command: $provenanceCommand,
+                exitCode: 0
+              },
+              qualityEvidence: {
+                status: "success",
+                predicateType: "https://breakmeifyoucan.dev/attestation/quality/v1",
+                subjectDigest: $digest,
+                repository: $repo,
+                commitSha: $sha,
+                workflowRef: $workflowRef,
+                runId: $runId,
+                verifiedAt: $verifiedAt,
+                verifier: "gh attestation verify",
+                command: $qualityCommand,
+                exitCode: 0
+              }
+            }' > artifacts/attestation/attestation-evidence.json
+
+          echo "Provenance statements: ${PROVENANCE_COUNT}; quality statements: ${QUALITY_COUNT}"
+
+      - name: Upload attestation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: attestation-evidence
+          path: artifacts/attestation/attestation-evidence.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Canonical evidence manifest. Runs even when quality failed so the evidence
+  # of the failure is uploadable; the policy gate then blocks the release.
+  # ---------------------------------------------------------------------------
+  evidence:
+    name: Generate and enforce evidence
+    needs: [quality, image, attest]
+    # Release runs only: a pull request has no image to bind evidence to.
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      QUALITY_RESULT: ${{ needs.quality.result }}
+      IMAGE_RESULT: ${{ needs.image.result }}
+      ATTEST_RESULT: ${{ needs.attest.result }}
+      IMAGE_REFERENCE: ${{ needs.image.outputs.reference }}
+      IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Download quality reports
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: quality-reports
+          path: artifacts/quality
+
+      - name: Download attestation evidence
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: attestation-evidence
+          path: artifacts/attestation
+
+      - name: Write the run context
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          def status(value: str) -> str:
+              return {"success": "success", "failure": "failure"}.get(value, "missing")
+
+          attestation_path = "artifacts/attestation/attestation-evidence.json"
+          attestations = {"buildProvenance": {"status": "missing"}, "qualityEvidence": {"status": "missing"}}
+          if os.path.exists(attestation_path):
+              attestations = json.load(open(attestation_path))
+
+          context = {
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "commitSha": os.environ["GITHUB_SHA"],
+              "branch": os.environ.get("GITHUB_REF_NAME", ""),
+              "workflow": {
+                  "name": os.environ["GITHUB_WORKFLOW"],
+                  "file": ".github/workflows/ci.yml",
+                  "runId": os.environ["GITHUB_RUN_ID"],
+                  "runAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                  "runUrl": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+                  "event": os.environ["GITHUB_EVENT_NAME"],
+                  "actor": os.environ.get("GITHUB_ACTOR", ""),
+                  "conclusion": status(os.environ.get("QUALITY_RESULT", "missing")),
+              },
+              "build": {
+                  "status": status(os.environ.get("QUALITY_RESULT", "missing")),
+                  "configuration": "Release",
+                  "framework": "net10.0",
+                  "dotnetVersion": os.environ.get("DOTNET_VERSION", ""),
+                  "runner": os.environ.get("RUNNER_OS", "") + "-" + os.environ.get("RUNNER_ARCH", ""),
+              },
+              "image": {
+                  "reference": os.environ.get("IMAGE_REFERENCE", ""),
+                  "digest": os.environ.get("IMAGE_DIGEST") or None,
+              },
+              "attestations": attestations,
+          }
+
+          os.makedirs("artifacts", exist_ok=True)
+          with open("artifacts/ci-context.json", "w", encoding="utf-8") as handle:
+              json.dump(context, handle, indent=2)
+          print(json.dumps(context, indent=2))
+          PY
+
+      - name: Generate the canonical evidence manifest
+        run: |
+          set -euo pipefail
+          AUDIT_EXIT=1
+          if [ -f artifacts/quality/nuget-audit-exit-code.txt ]; then
+            AUDIT_EXIT="$(cat artifacts/quality/nuget-audit-exit-code.txt)"
+          fi
+
+          dotnet run --project tools/BreakMeIfYouCan.EvidenceGenerator/BreakMeIfYouCan.EvidenceGenerator.csproj -c Release -- \
+            --context artifacts/ci-context.json \
+            --test-results artifacts/quality/test-results \
+            --coverage artifacts/quality/coverage \
+            --audit artifacts/quality/nuget-audit.json \
+            --audit-exit-code "$AUDIT_EXIT" \
+            --coverage-threshold "${COVERAGE_THRESHOLD}" \
+            --expected-assemblies BreakMeIfYouCan.Tests.Unit,BreakMeIfYouCan.Tests.Integration \
+            --output artifacts/evidence/ci-evidence.json
+
+      - name: Upload the evidence manifest
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-evidence
+          path: artifacts/evidence/ci-evidence.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce the release policy
+        run: |
+          set -euo pipefail
+          dotnet run --project tools/BreakMeIfYouCan.EvidenceGenerator/BreakMeIfYouCan.EvidenceGenerator.csproj -c Release --no-build -- \
+            --check artifacts/evidence/ci-evidence.json
+
+  # ---------------------------------------------------------------------------
+  # Deploy the exact digest, then verify what Fly actually runs.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy and verify the runtime digest
+    needs: [quality, image, attest, evidence]
+    # Deployment needs an explicit operator opt-in: a merge must never provision
+    # paid infrastructure without a deliberate decision.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      IMAGE_REFERENCE: ${{ needs.image.outputs.reference }}
+      IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # v1.6
+
+      - name: Require the deployment token
+        run: |
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error::FLY_API_TOKEN is not configured. Deployment requires an explicit token secret."
+            exit 1
+          fi
+
+      - name: Deploy the exact digest
+        run: |
+          set -euo pipefail
+          flyctl deploy \
+            --app "${FLY_APP}" \
+            --image "${IMAGE_REFERENCE}@${IMAGE_DIGEST}" \
+            --strategy rolling \
+            --wait-timeout 300 \
+            --yes
+
+      - name: Record the deployment intent
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/deployment
+          jq -n \
+            --arg digest "${IMAGE_DIGEST}" \
+            --arg repo "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg runId "${GITHUB_RUN_ID}" \
+            --arg deployedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              requestedDigest: $digest,
+              repository: $repo,
+              commitSha: $sha,
+              runId: $runId,
+              deployedAt: $deployedAt
+            }' > artifacts/deployment/deploy-intent.json
+          cat artifacts/deployment/deploy-intent.json
+
+      - name: Upload the deployment intent
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: deployment-intent
+          path: artifacts/deployment/deploy-intent.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Verify the running image digest from the Fly Machines API
+        run: |
+          set -euo pipefail
+          MACHINES_URL="https://api.machines.dev/v1/apps/${FLY_APP}/machines"
+          MACHINES="$(curl -fsS -H "Authorization: Bearer ${FLY_API_TOKEN}" "${MACHINES_URL}")"
+          OBSERVED="$(echo "${MACHINES}" | jq -r '[.[] | select(.state == "started")][0].config.image // empty')"
+
+          if [ -z "${OBSERVED}" ]; then
+            echo "::error::No started machine was reported by the Fly Machines API."
+            exit 1
+          fi
+
+          echo "requested: ${IMAGE_DIGEST}"
+          echo "observed:  ${OBSERVED}"
+
+          case "${OBSERVED}" in
+            *"${IMAGE_DIGEST}") echo "The running image matches the requested and attested digest." ;;
+            *)
+              echo "::error::The running image does not match the deployed digest."
+              exit 1
+              ;;
+          esac
+
+      - name: Point the proof endpoint at this repository
+        run: |
+          set -euo pipefail
+          flyctl secrets set --app "${FLY_APP}" --stage "Proof__Repository=${GITHUB_REPOSITORY}"
+          echo "Proof__Repository staged. Proof__GitHubToken and Proof__Fly__ApiToken are operator-managed secrets."
+
+  # ---------------------------------------------------------------------------
+  # Pull requests only: dependency review. Never reaches production.
+  # ---------------------------------------------------------------------------
+  dependency-review:
+    name: Dependency review
+    # The review action needs the repository dependency graph. It stays opt-in so a
+    # new repository does not fail every pull request on a repository setting.
+    if: github.event_name == 'pull_request' && vars.DEPENDENCY_REVIEW_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure

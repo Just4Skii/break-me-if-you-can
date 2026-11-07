@@ -1,0 +1,43 @@
+# Deployment is performed by .github/workflows/ci.yml using an immutable image digest:
+#   flyctl deploy --image ghcr.io/<owner>/<repo>@sha256:<digest>
+# This file only describes the runtime shape. The digest is never written here.
+app = "break-me-if-you-can"
+primary_region = "jnb"
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_URLS = "http://+:8080"
+  Proof__WorkflowFile = ".github/workflows/ci.yml"
+  Proof__Fly__AppName = "break-me-if-you-can"
+  Proof__MaxEvidenceAgeHours = "24"
+  Proof__CoverageThresholdPercent = "75"
+  Arena__GlobalConcurrencyLimit = "8"
+  Arena__MaxConcurrentRuns = "2"
+  Database__AutoMigrate = "true"
+  Runtime__KillSwitch = "false"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 200
+    soft_limit = 120
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "3s"
+  grace_period = "20s"
+  method = "GET"
+  path = "/healthz"
+
+[[vm]]
+  # Smallest shared machine: the arena is deliberately not a free compute service.
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpus = 1
