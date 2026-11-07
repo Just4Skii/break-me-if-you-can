@@ -4,10 +4,6 @@
 app = "break-me-if-you-can"
 primary_region = "jnb"
 
-[build]
-  # The image is supplied by the pipeline; never built on Fly.
-  image = "ghcr.io/skinny1ne/break-me-if-you-can:runtime-placeholder"
-
 [env]
   ASPNETCORE_ENVIRONMENT = "Production"
   ASPNETCORE_URLS = "http://+:8080"

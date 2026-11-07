@@ -237,7 +237,7 @@ The Dockerfile builds the React bundle and publishes the API with `-p:CommitSha`
 
 Target region: **Johannesburg (`jnb`)**. The deployment path is implemented but **not yet executed**, because it requires a Fly account, a paid machine and secrets. Until it runs, `/proof` correctly reports `UNKNOWN` rather than a green state.
 
-The pipeline deploys an immutable digest:
+Deployment is gated by the repository variable `DEPLOY_ENABLED=true`, so merging a pull request never provisions paid infrastructure by accident. Once enabled, the pipeline deploys an immutable digest:
 
 ```bash
 flyctl deploy --app break-me-if-you-can \

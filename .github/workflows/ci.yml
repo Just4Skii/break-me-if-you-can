@@ -558,7 +558,9 @@ jobs:
   deploy:
     name: Deploy and verify the runtime digest
     needs: [quality, image, attest, evidence]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Deployment needs an explicit operator opt-in: a merge must never provision
+    # paid infrastructure without a deliberate decision.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: production
     permissions:
