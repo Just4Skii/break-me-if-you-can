@@ -93,6 +93,7 @@ export interface ProofReport {
     machineCreatedAt?: string
     appName?: string
     machineId?: string
+    machineCount?: number
     region?: string
     source: string
     sourceUrl?: string

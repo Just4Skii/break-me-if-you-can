@@ -427,8 +427,12 @@ function ArtifactSection({ report }: { report: ProofReport }) {
               <dd className="mono">{report.deployment.appName ?? 'not recorded'}</dd>
             </div>
             <div>
-              <dt>machine</dt>
-              <dd className="mono truncate">{report.deployment.machineId ?? 'not recorded'}</dd>
+              <dt>machines</dt>
+              <dd className="mono truncate">
+                {report.deployment.machineCount && report.deployment.machineCount > 1
+                  ? report.deployment.machineCount + ' running, all must agree'
+                  : report.deployment.machineId ?? 'not recorded'}
+              </dd>
             </div>
             <div>
               <dt>region</dt>

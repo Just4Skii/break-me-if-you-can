@@ -68,7 +68,7 @@ jobs:
           npm run build
 
       - name: Restore dependencies
-        run: dotnet restore BreakMeIfYouCan.slnx
+        run: dotnet restore BreakMeIfYouCan.slnx --locked-mode
 
       - name: Verify formatting
         run: dotnet format BreakMeIfYouCan.slnx --verify-no-changes --no-restore --verbosity diagnostic
@@ -477,6 +477,9 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Restore the evidence tool from the lock file
+        run: dotnet restore tools/BreakMeIfYouCan.EvidenceGenerator/BreakMeIfYouCan.EvidenceGenerator.csproj --locked-mode
+
       - name: Download quality reports
         continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -549,7 +552,7 @@ jobs:
             AUDIT_EXIT="$(cat artifacts/quality/nuget-audit-exit-code.txt)"
           fi
 
-          dotnet run --project tools/BreakMeIfYouCan.EvidenceGenerator/BreakMeIfYouCan.EvidenceGenerator.csproj -c Release -- \
+          dotnet run --project tools/BreakMeIfYouCan.EvidenceGenerator/BreakMeIfYouCan.EvidenceGenerator.csproj -c Release --no-restore -- \
             --context artifacts/ci-context.json \
             --test-results artifacts/quality/test-results \
             --coverage artifacts/quality/coverage \
@@ -645,25 +648,51 @@ jobs:
       - name: Verify the running image digest from the Fly Machines API
         run: |
           set -euo pipefail
-          MACHINES_URL="https://api.machines.dev/v1/apps/${FLY_APP}/machines"
-          MACHINES="$(curl -fsS -H "Authorization: Bearer ${FLY_API_TOKEN}" "${MACHINES_URL}")"
-          OBSERVED="$(echo "${MACHINES}" | jq -r '[.[] | select(.state == "started")][0].config.image // empty')"
+          MACHINES_URL="https://api.machines.dev/v1/apps/\${FLY_APP}/machines"
+          MACHINES="$(curl -fsS -H "Authorization: Bearer \${FLY_API_TOKEN}" "\${MACHINES_URL}")"
 
-          if [ -z "${OBSERVED}" ]; then
-            echo "::error::No started machine was reported by the Fly Machines API."
+          STARTED="$(echo "\${MACHINES}" | jq -c '[.[] | select(.state == "started")]')"
+          COUNT="$(echo "\${STARTED}" | jq 'length')"
+
+          if [ "\${COUNT}" -eq 0 ]; then
+            echo "::error::No machine is in the 'started' state; there is no running image to verify."
             exit 1
           fi
 
-          echo "requested: ${IMAGE_DIGEST}"
-          echo "observed:  ${OBSERVED}"
+          # The observed evidence is image_ref only. config.image is the request and is
+          # deliberately not read. Every started machine must report the same values.
+          PAIRS="$(echo "\${STARTED}" | jq -r '.[] | [.image_ref.registry // "", .image_ref.repository // "", .image_ref.digest // ""] | @tsv' | sort -u)"
 
-          case "${OBSERVED}" in
-            *"${IMAGE_DIGEST}") echo "The running image matches the requested and attested digest." ;;
-            *)
-              echo "::error::The running image does not match the deployed digest."
-              exit 1
-              ;;
-          esac
+          if [ "$(printf '%s\n' "\${PAIRS}" | wc -l)" -ne 1 ]; then
+            echo "::error::The \${COUNT} started machines report inconsistent image_ref values:"
+            echo "\${PAIRS}"
+            exit 1
+          fi
+
+          REGISTRY="$(printf '%s' "\${PAIRS}" | cut -f1)"
+          REPOSITORY="$(printf '%s' "\${PAIRS}" | cut -f2)"
+          OBSERVED="$(printf '%s' "\${PAIRS}" | cut -f3)"
+          EXPECTED_REPOSITORY="\${GITHUB_REPOSITORY,,}"
+
+          if [ "\${REGISTRY,,}" != "ghcr.io" ] || [ "\${REPOSITORY,,}" != "\${EXPECTED_REPOSITORY}" ]; then
+            echo "::error::The running image is \${REGISTRY}/\${REPOSITORY}; expected ghcr.io/\${EXPECTED_REPOSITORY}."
+            exit 1
+          fi
+
+          if [ -z "\${OBSERVED}" ]; then
+            echo "::error::The started machine did not report image_ref.digest."
+            exit 1
+          fi
+
+          echo "requested: \${IMAGE_DIGEST}"
+          echo "observed:  \${REGISTRY}/\${REPOSITORY}@\${OBSERVED}"
+
+          if [ "\${OBSERVED,,}" != "\${IMAGE_DIGEST,,}" ]; then
+            echo "::error::The running digest does not equal the requested and attested digest."
+            exit 1
+          fi
+
+          echo "The running image matches the requested digest on every started machine."
 
       - name: Point the proof endpoint at this repository
         run: |

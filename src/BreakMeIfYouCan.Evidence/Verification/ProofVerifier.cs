@@ -429,6 +429,9 @@ public sealed class ProofVerifier
             checks.Add(Verified("deployment.health", "Deployment health", "The platform reports the machine as healthy."));
         }
 
+        // The digest alone is not enough: the running image must also come from the expected repository.
+        checks.Add(CheckRuntimeRepository(snapshot.Runtime, ImageReferenceParts.Parse(evidence?.Image.Reference)));
+
         // ---------------------------------------------------------------- verdict
 
         var required = checks.Where(c => c.Required).ToList();
@@ -565,6 +568,7 @@ public sealed class ProofVerifier
                 MachineCreatedAt = runtime?.MachineCreatedAt,
                 AppName = runtime?.AppName,
                 MachineId = runtime?.MachineId,
+                MachineCount = runtime?.MachineCount,
                 Region = runtime?.Region,
                 Source = runtime?.Source ?? "unknown",
                 SourceUrl = runtime?.SourceUrl,
@@ -596,6 +600,38 @@ public sealed class ProofVerifier
             Notes = snapshot.Notes,
             VerifyCommand = verifyCommand,
         };
+    }
+
+    private static ProofCheck CheckRuntimeRepository(RuntimeObservation? runtime, ImageReferenceParts? expected)
+    {
+        const string id = "deployment.image_repository";
+        const string label = "Runtime image repository";
+
+        if (runtime is null || !runtime.Available)
+        {
+            return Unknown(id, label, "The runtime platform could not be queried, so the image repository is unknown.");
+        }
+
+        if (string.IsNullOrWhiteSpace(runtime.Registry) || string.IsNullOrWhiteSpace(runtime.Repository))
+        {
+            return Unknown(
+                id,
+                label,
+                "The platform did not report the registry and repository of the running image, so it cannot be compared.");
+        }
+
+        if (expected is null)
+        {
+            return Unknown(id, label, "The built image reference is not recorded, so the repository cannot be compared.");
+        }
+
+        return expected.Matches(runtime.Registry, runtime.Repository)
+            ? Verified(id, label, "The running image is " + runtime.Registry + "/" + runtime.Repository + ".")
+            : Failed(
+                id,
+                label,
+                "The running image is " + runtime.Registry + "/" + runtime.Repository +
+                " but the built image is " + expected.Registry + "/" + expected.Repository + ".");
     }
 
     private static ProofCheck BuildChainCheck(string? built, string? attested, string? requested, string? observed)

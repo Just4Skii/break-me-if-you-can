@@ -409,6 +409,44 @@ public sealed class ProofVerifierTests
     }
 
     [Fact]
+    public void RuntimeRepositoryMismatch_Fails()
+    {
+        var runtime = ProofFixtures.Snapshot().Runtime! with
+        {
+            Registry = "ghcr.io",
+            Repository = "someone-else/another-repo",
+        };
+
+        var report = Verifier.Verify(ProofFixtures.Snapshot() with { Runtime = runtime });
+
+        Assert.Equal(EvidenceState.Failed, report.State);
+        Assert.Contains(report.Checks, c => c.Id == "deployment.image_repository" && c.State == EvidenceState.Failed);
+    }
+
+    [Fact]
+    public void MissingRuntimeRepository_IsUnknown()
+    {
+        var runtime = ProofFixtures.Snapshot().Runtime! with { Registry = null, Repository = null };
+
+        var report = Verifier.Verify(ProofFixtures.Snapshot() with { Runtime = runtime });
+
+        Assert.Equal(EvidenceState.Unknown, report.State);
+        Assert.Contains(report.Checks, c => c.Id == "deployment.image_repository" && c.State == EvidenceState.Unknown);
+    }
+
+    [Fact]
+    public void MissingBuiltImageReference_MakesTheRepositoryUnknown()
+    {
+        var manifest = ProofFixtures.Manifest();
+        manifest = manifest with { Image = manifest.Image with { Reference = string.Empty } };
+
+        var report = Verifier.Verify(ProofFixtures.Snapshot(manifest));
+
+        Assert.Equal(EvidenceState.Unknown, report.State);
+        Assert.Contains(report.Checks, c => c.Id == "deployment.image_repository" && c.State == EvidenceState.Unknown);
+    }
+
+    [Fact]
     public void SecurityPosture_DistinguishesScanFromAssessment()
     {
         var report = Verifier.Verify(ProofFixtures.Snapshot());

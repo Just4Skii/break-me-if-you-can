@@ -14,6 +14,8 @@ public sealed class ProofSourceTests
 
     // ---------------------------------------------------------------- Fly probe
 
+    private const string OtherSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
     [Fact]
     public async Task FlyProbe_WithoutConfigurationIsUnavailable()
     {
@@ -43,67 +45,224 @@ public sealed class ProofSourceTests
     }
 
     [Fact]
-    public async Task FlyProbe_ReadsTheDigestAndHealthFromTheMachinesApi()
+    public async Task FlyProbe_UsesImageRefDigestAndNeverConfigImage()
     {
-        var json = """
-            [
-              {
-                "id": "machine-1",
-                "state": "started",
-                "region": "jnb",
-                "created_at": "2026-11-07T10:00:00Z",
-                "config": { "image": "ghcr.io/owner/repo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
-              }
-            ]
-            """;
+        // config.image deliberately points at a different image and digest.
+        var list = MachineList(MachineJson(
+            "m1",
+            "started",
+            "sha256:" + Sha,
+            configImage: "ghcr.io/someone/else@sha256:" + OtherSha));
 
-        var probe = new FlyRuntimeProbe(
-            new StubHttpClientFactory(request =>
-            {
-                Assert.Equal("https://api.machines.dev/v1/apps/break-me/machines", request.RequestUri!.ToString());
-                Assert.Equal("Bearer", request.Headers.Authorization!.Scheme);
-                return JsonResponse(json);
-            }),
-            Options.Create(new ProofOptions
-            {
-                Fly = new FlyProofOptions { AppName = "break-me", ApiToken = "fly-token" },
-            }),
-            NullLogger<FlyRuntimeProbe>.Instance);
+        var requests = new List<string>();
+        var probe = CreateFlyProbe(request =>
+        {
+            requests.Add(request.RequestUri!.ToString());
+            return JsonResponse(list);
+        });
 
         var observation = await probe.ProbeAsync(CancellationToken.None);
 
         Assert.True(observation.Available);
         Assert.Equal("sha256:" + Sha, observation.Digest);
-        Assert.True(observation.Healthy);
-        Assert.Equal("jnb", observation.Region);
-        Assert.Equal("machine-1", observation.MachineId);
-        Assert.Equal("fly-machines-api", observation.Source);
+        Assert.NotEqual(OtherSha, observation.Digest);
+        Assert.Equal("ghcr.io", observation.Registry);
+        Assert.Equal("just4skii/break-me-if-you-can", observation.Repository);
+        Assert.Equal("ghcr.io/just4skii/break-me-if-you-can:sha-abc@sha256:" + Sha, observation.ImageReference);
+        Assert.Null(observation.Failure);
+        Assert.Equal(1, observation.MachineCount);
+        Assert.Single(requests);
     }
 
     [Fact]
-    public async Task FlyProbe_ReportsATagAsAnUnavailableDigest()
+    public async Task FlyProbe_MissingImageRefIsUnknownEvenWithConfigImage()
     {
-        var json = """[ { "id": "m", "state": "started", "config": { "image": "ghcr.io/owner/repo:latest" } } ]""";
+        var list = MachineList(MachineJson(
+            "m1",
+            "started",
+            null,
+            includeImageRef: false,
+            configImage: "ghcr.io/just4skii/break-me-if-you-can@sha256:" + Sha));
 
-        var probe = new FlyRuntimeProbe(
-            new StubHttpClientFactory(_ => JsonResponse(json)),
-            Options.Create(new ProofOptions { Fly = new FlyProofOptions { AppName = "break-me", ApiToken = "t" } }),
-            NullLogger<FlyRuntimeProbe>.Instance);
+        var probe = CreateFlyProbe(request => IsListRequest(request)
+            ? JsonResponse(list)
+            : new HttpResponseMessage(HttpStatusCode.NotFound));
 
         var observation = await probe.ProbeAsync(CancellationToken.None);
 
         Assert.True(observation.Available);
         Assert.Null(observation.Digest);
-        Assert.Contains("tag", observation.Failure, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(observation.ImageReference);
+        Assert.Contains("image_ref.digest", observation.Failure);
+    }
+
+    [Fact]
+    public async Task FlyProbe_MissingDigestIsUnknown()
+    {
+        var list = MachineList(MachineJson(
+            "m1",
+            "started",
+            null,
+            configImage: "ghcr.io/just4skii/break-me-if-you-can@sha256:" + Sha));
+
+        var probe = CreateFlyProbe(request => IsListRequest(request)
+            ? JsonResponse(list)
+            : new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        var observation = await probe.ProbeAsync(CancellationToken.None);
+
+        Assert.True(observation.Available);
+        Assert.Null(observation.Digest);
+        Assert.Contains("image_ref.digest", observation.Failure);
+    }
+
+    [Fact]
+    public async Task FlyProbe_EmptyDigestIsRefetchedFromTheSingleMachineEndpoint()
+    {
+        var list = MachineList(MachineJson("m1", "started", string.Empty));
+        var refreshed = MachineJson("m1", "started", "sha256:" + Sha);
+        var singleCalls = 0;
+
+        var probe = CreateFlyProbe(request =>
+        {
+            if (IsListRequest(request))
+            {
+                return JsonResponse(list);
+            }
+
+            singleCalls++;
+            return JsonResponse(refreshed);
+        });
+
+        var observation = await probe.ProbeAsync(CancellationToken.None);
+
+        Assert.Equal("sha256:" + Sha, observation.Digest);
+        Assert.Null(observation.Failure);
+        Assert.Equal(1, singleCalls);
+    }
+
+    [Fact]
+    public async Task FlyProbe_EmptyDigestAfterRetriesIsUnknown()
+    {
+        var list = MachineList(MachineJson("m1", "started", string.Empty));
+        var singleCalls = 0;
+
+        var probe = CreateFlyProbe(request =>
+        {
+            if (IsListRequest(request))
+            {
+                return JsonResponse(list);
+            }
+
+            singleCalls++;
+            return JsonResponse(MachineJson("m1", "started", string.Empty));
+        });
+
+        var observation = await probe.ProbeAsync(CancellationToken.None);
+
+        Assert.True(observation.Available);
+        Assert.Null(observation.Digest);
+        Assert.Equal(2, singleCalls);
+        Assert.Contains("image_ref.digest", observation.Failure);
+    }
+
+    [Fact]
+    public async Task FlyProbe_ConfiguredMachineNotFoundIsUnavailableAndDoesNotFallBack()
+    {
+        var list = MachineList(MachineJson("m1", "started", "sha256:" + Sha));
+        var requests = 0;
+
+        var probe = CreateFlyProbe(
+            request =>
+            {
+                requests++;
+                return IsListRequest(request) ? JsonResponse(list) : new HttpResponseMessage(HttpStatusCode.NotFound);
+            },
+            machineId: "wanted");
+
+        var observation = await probe.ProbeAsync(CancellationToken.None);
+
+        Assert.False(observation.Available);
+        Assert.Contains("wanted", observation.Failure);
+        Assert.Equal(1, requests);
+    }
+
+    [Fact]
+    public async Task FlyProbe_MultipleStartedMachinesWithDifferentDigestsIsUnknown()
+    {
+        var list = MachineList(
+            MachineJson("m1", "started", "sha256:" + Sha),
+            MachineJson("m2", "started", "sha256:" + OtherSha));
+
+        var probe = CreateFlyProbe(request => IsListRequest(request)
+            ? JsonResponse(list)
+            : new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        var observation = await probe.ProbeAsync(CancellationToken.None);
+
+        Assert.True(observation.Available);
+        Assert.Null(observation.Digest);
+        Assert.Equal(2, observation.MachineCount);
+        Assert.Contains("different image digests", observation.Failure);
+    }
+
+    [Fact]
+    public async Task FlyProbe_MultipleStartedMachinesWithTheSameDigestIsObserved()
+    {
+        var list = MachineList(
+            MachineJson("m1", "started", "sha256:" + Sha),
+            MachineJson("m2", "started", "sha256:" + Sha));
+
+        var probe = CreateFlyProbe(request => IsListRequest(request)
+            ? JsonResponse(list)
+            : new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        var observation = await probe.ProbeAsync(CancellationToken.None);
+
+        Assert.Equal("sha256:" + Sha, observation.Digest);
+        Assert.Equal(2, observation.MachineCount);
+        Assert.Null(observation.MachineId);
+        Assert.True(observation.Healthy);
+    }
+
+    [Fact]
+    public async Task FlyProbe_NoStartedMachineIsUnavailable()
+    {
+        var list = MachineList(MachineJson("m1", "stopped", "sha256:" + Sha));
+
+        var probe = CreateFlyProbe(request => IsListRequest(request)
+            ? JsonResponse(list)
+            : new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        var observation = await probe.ProbeAsync(CancellationToken.None);
+
+        Assert.False(observation.Available);
+        Assert.Contains("started", observation.Failure);
+    }
+
+    [Fact]
+    public async Task FlyProbe_SelectsTheConfiguredStoppedMachineAndReportsUnhealthy()
+    {
+        var list = MachineList(
+            MachineJson("other", "started", "sha256:" + OtherSha),
+            MachineJson("wanted", "stopped", "sha256:" + Sha));
+
+        var probe = CreateFlyProbe(
+            request => IsListRequest(request) ? JsonResponse(list) : new HttpResponseMessage(HttpStatusCode.NotFound),
+            machineId: "wanted");
+
+        var observation = await probe.ProbeAsync(CancellationToken.None);
+
+        Assert.True(observation.Available);
+        Assert.Equal("wanted", observation.MachineId);
+        Assert.Equal("sha256:" + Sha, observation.Digest);
+        Assert.False(observation.Healthy);
     }
 
     [Fact]
     public async Task FlyProbe_HandlesAnErrorStatus()
     {
-        var probe = new FlyRuntimeProbe(
-            new StubHttpClientFactory(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)),
-            Options.Create(new ProofOptions { Fly = new FlyProofOptions { AppName = "break-me", ApiToken = "t" } }),
-            NullLogger<FlyRuntimeProbe>.Instance);
+        var probe = CreateFlyProbe(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
 
         var observation = await probe.ProbeAsync(CancellationToken.None);
 
@@ -111,28 +270,61 @@ public sealed class ProofSourceTests
         Assert.Contains("500", observation.Failure);
     }
 
-    [Fact]
-    public async Task FlyProbe_SelectsTheConfiguredMachine()
-    {
-        var json = """
-            [
-              { "id": "other", "state": "started", "config": { "image": "ghcr.io/o/r@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } },
-              { "id": "wanted", "state": "started", "config": { "image": "ghcr.io/o/r@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } }
-            ]
-            """;
-
-        var probe = new FlyRuntimeProbe(
-            new StubHttpClientFactory(_ => JsonResponse(json)),
+    private static FlyRuntimeProbe CreateFlyProbe(
+        Func<HttpRequestMessage, HttpResponseMessage> handler,
+        string? machineId = null) =>
+        new(
+            new StubHttpClientFactory(handler),
             Options.Create(new ProofOptions
             {
-                Fly = new FlyProofOptions { AppName = "app", ApiToken = "t", MachineId = "wanted" },
+                Fly = new FlyProofOptions
+                {
+                    AppName = "break-me",
+                    ApiToken = "fly-token",
+                    MachineId = machineId,
+                },
             }),
             NullLogger<FlyRuntimeProbe>.Instance);
 
-        var observation = await probe.ProbeAsync(CancellationToken.None);
+    private static bool IsListRequest(HttpRequestMessage request) =>
+        request.RequestUri!.AbsolutePath.EndsWith("/machines", StringComparison.Ordinal);
 
-        Assert.Equal("wanted", observation.MachineId);
-        Assert.Equal("sha256:" + Sha, observation.Digest);
+    private static string MachineList(params string[] machines) => "[" + string.Join(",", machines) + "]";
+
+    private static string MachineJson(
+        string id,
+        string state,
+        string? digest,
+        string? registry = "ghcr.io",
+        string? repository = "just4skii/break-me-if-you-can",
+        string? configImage = null,
+        bool includeImageRef = true)
+    {
+        var machine = new Dictionary<string, object?>
+        {
+            ["id"] = id,
+            ["state"] = state,
+            ["region"] = "jnb",
+            ["created_at"] = "2026-11-07T10:00:00Z",
+        };
+
+        if (includeImageRef)
+        {
+            machine["image_ref"] = new Dictionary<string, object?>
+            {
+                ["registry"] = registry,
+                ["repository"] = repository,
+                ["tag"] = "sha-abc",
+                ["digest"] = digest,
+            };
+        }
+
+        if (configImage is not null)
+        {
+            machine["config"] = new Dictionary<string, object?> { ["image"] = configImage };
+        }
+
+        return JsonSerializer.Serialize(machine);
     }
 
     // ---------------------------------------------------------------- GitHub attestations

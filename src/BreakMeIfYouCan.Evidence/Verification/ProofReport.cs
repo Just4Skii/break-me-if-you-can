@@ -209,6 +209,9 @@ public sealed record DeploymentInfo
 
     public string? MachineId { get; init; }
 
+    /// <summary>How many machines the observation covered. More than one must agree.</summary>
+    public int? MachineCount { get; init; }
+
     public string? Region { get; init; }
 
     public string Source { get; init; } = "unknown";
