@@ -1,15 +1,13 @@
 import { shortDigest } from '../format'
 import type { EvidenceState, ProofReport } from '../types'
 
-function stateOf(report: ProofReport, digest: string | undefined, ids: string[]): EvidenceState {
+/** A node is verified when the link that binds it to its neighbour is verified. */
+function linkState(report: ProofReport, digest: string | undefined, id: string): EvidenceState {
   if (!digest) return 'unknown'
-  const relevant = ids
-    .map((id) => report.checks.find((check) => check.id === id)?.state)
-    .filter((state): state is EvidenceState => Boolean(state))
 
-  if (relevant.some((state) => state === 'failed')) return 'failed'
-  if (relevant.length > 0 && relevant.every((state) => state === 'verified')) return 'verified'
-  return 'unknown'
+  const state = report.checks.find((check) => check.id === id)?.state
+  if (state === 'failed') return 'failed'
+  return state === 'verified' ? 'verified' : 'unknown'
 }
 
 export function DigestChain({ report }: { report: ProofReport }) {
@@ -21,34 +19,28 @@ export function DigestChain({ report }: { report: ProofReport }) {
       label: 'Built',
       caption: 'docker build output',
       digest: report.image.builtDigest,
-      state: stateOf(report, report.image.builtDigest, ['digest.build_vs_attested', 'digest.built_vs_observed']),
+      state: linkState(report, report.image.builtDigest, 'digest.build_vs_attested'),
     },
     {
       key: 'attested',
       label: 'Attested',
       caption: 'github attestation subject',
       digest: report.image.attestedDigest,
-      state: stateOf(report, report.image.attestedDigest, ['digest.build_vs_attested', 'digest.attested_vs_requested']),
+      state: linkState(report, report.image.attestedDigest, 'digest.build_vs_attested'),
     },
     {
       key: 'requested',
       label: 'Requested',
       caption: 'deploy intent record',
       digest: report.image.requestedDeploymentDigest,
-      state: stateOf(report, report.image.requestedDeploymentDigest, [
-        'digest.attested_vs_requested',
-        'digest.requested_vs_observed',
-      ]),
+      state: linkState(report, report.image.requestedDeploymentDigest, 'digest.attested_vs_requested'),
     },
     {
       key: 'observed',
       label: 'Observed',
       caption: 'fly machines api',
       digest: report.image.observedRunningDigest,
-      state: stateOf(report, report.image.observedRunningDigest, [
-        'digest.requested_vs_observed',
-        'digest.built_vs_observed',
-      ]),
+      state: linkState(report, report.image.observedRunningDigest, 'digest.requested_vs_observed'),
     },
   ]
 
@@ -60,22 +52,41 @@ export function DigestChain({ report }: { report: ProofReport }) {
       </div>
 
       <ol className="chain-list">
-        {nodes.map((node, index) => (
-          <li key={node.key} className={'chain-node chain-node-' + node.state}>
-            <div className="chain-rail" aria-hidden="true">
-              <span className="chain-marker" />
-              {index < nodes.length - 1 ? <span className="chain-line" /> : null}
-            </div>
-            <div className="chain-body">
-              <div className="chain-title">
-                <span className="chain-label">{node.label}</span>
-                <span className={'chain-dot state-' + node.state} />
+        {nodes.map((node, index) => {
+          const next = nodes[index + 1]
+          const gap = next !== undefined && !next.digest
+
+          return (
+            <li key={node.key} className={'chain-node chain-node-' + node.state}>
+              <span
+                className={
+                  'chain-track chain-track-' + node.state + (gap ? ' chain-track-gap' : '')
+                }
+                aria-hidden="true"
+              />
+              <span className={'chain-marker' + (node.digest ? ' is-present' : ' is-missing')} aria-hidden="true" />
+              <div className="chain-body">
+                <div className="chain-title">
+                  <span className="chain-label">{node.label}</span>
+                  <span className={'chain-dot state-' + node.state} />
+                </div>
+                <code className="chain-digest" title={node.digest ?? undefined}>
+                  {shortDigest(node.digest)}
+                </code>
+                <span className="chain-caption">{node.caption}</span>
               </div>
-              <code className="chain-digest">{shortDigest(node.digest)}</code>
-              <span className="chain-caption">{node.caption}</span>
-            </div>
-          </li>
-        ))}
+            </li>
+          )
+        })}
+
+        <li className={'chain-node chain-node-final chain-node-' + chainState}>
+          <span className="chain-marker chain-marker-final" aria-hidden="true" />
+          <div className="chain-body">
+            <span className="chain-label">Verdict</span>
+            <code className={'chain-digest chain-verdict-word state-' + chainState}>{chainState}</code>
+            <span className="chain-caption">all required checks</span>
+          </div>
+        </li>
       </ol>
 
       <p className={'chain-verdict state-' + chainState}>
@@ -83,7 +94,7 @@ export function DigestChain({ report }: { report: ProofReport }) {
           ? 'One image, from source to running machine. The circuit is complete.'
           : chainState === 'failed'
             ? 'The circuit is broken: at least two digests disagree.'
-            : 'The circuit is incomplete. A digest that was not observed cannot be verified.'}
+            : 'The chain stops at the last value that was actually observed. Nothing beyond it can be claimed.'}
       </p>
     </section>
   )

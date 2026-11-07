@@ -139,9 +139,10 @@ quality ──► image ──► attest ──► evidence ──► deploy
 3. Release build with the commit SHA compiled in.
 4. Unit tests with Coverlet and TRX output.
 5. PostgreSQL integration tests against a real database (service container, or Testcontainers locally).
-6. Merge the Cobertura reports and enforce **75% line coverage**. A missing `Summary.txt` fails the step.
-7. `dotnet list package --vulnerable --include-transitive --format json`; the JSON is parsed and the step fails on any advisory.
-8. Upload the quality reports even when a test fails.
+6. The React client is type-checked and built with Vite, so a broken client cannot reach an image.
+7. Merge the Cobertura reports and enforce **75% line coverage**. A missing `Summary.txt` fails the step.
+8. `dotnet list package --vulnerable --include-transitive --format json`; the JSON is parsed and the step fails on any advisory.
+9. Upload the quality reports even when a test fails.
 
 ### Release (main only)
 
@@ -164,6 +165,7 @@ Every action is pinned to a full commit SHA. Versions were resolved from the tag
 | --- | --- | --- | --- |
 | `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` | https://github.com/actions/checkout/releases/tag/v5.1.0 |
 | `actions/setup-dotnet` | v4.3.1 | `67a3573c9a986a3f9c594539f4ab511d57bb3ce9` | https://github.com/actions/setup-dotnet/releases/tag/v4.3.1 |
+| `actions/setup-node` | v4.4.0 | `49933ea5288caeca8642d1e84afbd3f7d6820020` | https://github.com/actions/setup-node/releases/tag/v4.4.0 |
 | `actions/upload-artifact` | v4.6.2 | `ea165f8d65b6e75b540449e92b4886f43607fa02` | https://github.com/actions/upload-artifact/releases/tag/v4.6.2 |
 | `actions/download-artifact` | v4.3.0 | `d3f86a106a0bac45b974a628896c90dbdf5c8093` | https://github.com/actions/download-artifact/releases/tag/v4.3.0 |
 | `docker/setup-buildx-action` | v3.12.0 | `8d2750c68a42422c14e847fe6c8ac0403b4cbd6f` | https://github.com/docker/setup-buildx-action/releases/tag/v3.12.0 |

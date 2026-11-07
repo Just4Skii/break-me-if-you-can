@@ -460,8 +460,8 @@
   }
 
   .tour-index ol {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 0 var(--space-4);
   }
 
@@ -486,12 +486,11 @@
 /* Source links used inline inside prose must not break the baseline. */
 .prose .source-link {
   display: inline;
-  margin-top: 0;
+  margin: 0;
   font-family: var(--font-mono);
   font-size: 0.86em;
-  padding: 1px 5px;
-  background: var(--bg-raised);
-  border-radius: var(--radius-1);
+  padding: 0;
+  background: none;
   border-bottom: 1px solid var(--amber);
 }
 
