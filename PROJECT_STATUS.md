@@ -1,7 +1,7 @@
 # Project status
 
 Last updated: 2026-11-07
-Branch: `feat/initial-release`
+Branch: `main`
 Repository: `Just4Skii/break-me-if-you-can` (creation and first CI run pending at the time of writing)
 
 ## Summary
@@ -18,7 +18,17 @@ The consequence is stated plainly: until the pipeline runs and a release is depl
 | 2. Engineering evidence | Complete and verified locally | Manifest generator, parsers, policy gate, verifier and `/proof` with 105 unit tests |
 | 3. Race Condition Arena | Complete and verified locally | 23 PostgreSQL integration tests, including 50 concurrent transfers under both strategies |
 | 4. Attestation and deployment | Attestation complete, deployment blocked | SLSA provenance and quality attestation published and verified; Fly deploy gated off pending approval |
-| 5. Code tour and release | Documentation complete, public release pending | README, six ADRs, interactive code tour, PROJECT_STATUS |
+| 5. Code tour and release | Documentation and design QA complete, public release pending | README, six ADRs, interactive code tour, design QA pass recorded in .design/memory.md |
+
+## Remote verification (GitHub Actions)
+
+| Workflow run | Commit | Result |
+| --- | --- | --- |
+| [42367193984](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42367193984) | `e5b4edf6` | success — quality, image, attestation and evidence jobs |
+| [42367956265](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42367956265) | `354c30fc` | success — release evidence documentation |
+| [42368969420](https://github.com/Just4Skii/break-me-if-you-can/actions/runs/42368969420) | `d46c7d9a` | success — includes the design-QA client build in the quality gate |
+
+The quality job now type-checks and builds the React client as well as the .NET solution. The image, attestation and evidence jobs ran on every main push listed above; deployment remains skipped by design.
 
 ## Verified locally
 
