@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-07
 Branch: `feat/initial-release`
-Repository: `Skinny1ne/break-me-if-you-can` (creation and first CI run pending at the time of writing)
+Repository: `Just4Skii/break-me-if-you-can` (creation and first CI run pending at the time of writing)
 
 ## Summary
 

@@ -177,10 +177,10 @@ public sealed class ProofSourceTests
               "predicateType": "https://slsa.dev/provenance/v1",
               "predicate": {
                 "buildDefinition": {
-                  "externalParameters": { "workflow": { "repository": "https://github.com/Skinny1ne/break-me-if-you-can", "path": ".github/workflows/ci.yml", "ref": "refs/heads/main" } },
+                  "externalParameters": { "workflow": { "repository": "https://github.com/Just4Skii/break-me-if-you-can", "path": ".github/workflows/ci.yml", "ref": "refs/heads/main" } },
                   "resolvedDependencies": [ { "digest": { "gitCommit": "0123456789abcdef0123456789abcdef01234567" } } ]
                 },
-                "runDetails": { "metadata": { "invocationId": "https://github.com/Skinny1ne/break-me-if-you-can/actions/runs/1234567890" } }
+                "runDetails": { "metadata": { "invocationId": "https://github.com/Just4Skii/break-me-if-you-can/actions/runs/1234567890" } }
               }
             }
             """));

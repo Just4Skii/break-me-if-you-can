@@ -74,7 +74,7 @@ public sealed class ProofEndpointTests(PostgresFixture database)
     private static CiEvidenceManifest MinimalManifest() => new()
     {
         SchemaVersion = CiEvidenceManifest.CurrentSchemaVersion,
-        Repository = "Skinny1ne/break-me-if-you-can",
+        Repository = "Just4Skii/break-me-if-you-can",
         CommitSha = "0123456789abcdef0123456789abcdef01234567",
         Branch = "main",
         GeneratedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
@@ -84,7 +84,7 @@ public sealed class ProofEndpointTests(PostgresFixture database)
             File = ".github/workflows/ci.yml",
             RunId = "1234567890",
             RunAttempt = "1",
-            RunUrl = "https://github.com/Skinny1ne/break-me-if-you-can/actions/runs/1234567890",
+            RunUrl = "https://github.com/Just4Skii/break-me-if-you-can/actions/runs/1234567890",
             Event = "push",
             Conclusion = PipelineStatus.Success,
         },
@@ -92,7 +92,7 @@ public sealed class ProofEndpointTests(PostgresFixture database)
         Tests = new TestEvidence { Status = PipelineStatus.Success, Total = 94, Passed = 94, Failed = 0, Skipped = 0, Reports = ["tests.trx"] },
         Coverage = new CoverageEvidence { LinePercent = 92.7, BranchPercent = 80.8, ThresholdPercent = 75, MeetsThreshold = true },
         DependencyAudit = new DependencyAuditEvidence { Status = AuditStatus.Clean },
-        Image = new ImageEvidence { Reference = "ghcr.io/Skinny1ne/break-me-if-you-can", Digest = "sha256:" + new string('a', 64) },
+        Image = new ImageEvidence { Reference = "ghcr.io/Just4Skii/break-me-if-you-can", Digest = "sha256:" + new string('a', 64) },
         Attestations = new AttestationEvidence
         {
             BuildProvenance = new AttestationRecord
@@ -100,7 +100,7 @@ public sealed class ProofEndpointTests(PostgresFixture database)
                 Status = PipelineStatus.Success,
                 PredicateType = "https://slsa.dev/provenance/v1",
                 SubjectDigest = "sha256:" + new string('a', 64),
-                Repository = "Skinny1ne/break-me-if-you-can",
+                Repository = "Just4Skii/break-me-if-you-can",
                 CommitSha = "0123456789abcdef0123456789abcdef01234567",
             },
         },

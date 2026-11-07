@@ -6,7 +6,7 @@ namespace BreakMeIfYouCan.Tests.Unit;
 internal static class ProofFixtures
 {
     public const string Commit = "0123456789abcdef0123456789abcdef01234567";
-    public const string Repository = "Skinny1ne/break-me-if-you-can";
+    public const string Repository = "Just4Skii/break-me-if-you-can";
     public const string Workflow = ".github/workflows/ci.yml";
 
     public static readonly string Digest = "sha256:" + new string('a', 64);
@@ -30,7 +30,7 @@ internal static class ProofFixtures
                 RunAttempt = "1",
                 RunUrl = "https://github.com/" + Repository + "/actions/runs/1234567890",
                 Event = "push",
-                Actor = "Skinny1ne",
+                Actor = "Just4Skii",
                 Conclusion = PipelineStatus.Success,
             },
             Build = new BuildEvidence

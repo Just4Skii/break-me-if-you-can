@@ -26,17 +26,17 @@ public sealed class AttestationPayloadParserTests
                   "externalParameters": {
                     "workflow": {
                       "ref": "refs/heads/main",
-                      "repository": "https://github.com/Skinny1ne/break-me-if-you-can",
+                      "repository": "https://github.com/Just4Skii/break-me-if-you-can",
                       "path": ".github/workflows/ci.yml"
                     }
                   },
                   "resolvedDependencies": [
-                    { "uri": "git+https://github.com/Skinny1ne/break-me-if-you-can@refs/heads/main", "digest": { "gitCommit": "0123456789abcdef0123456789abcdef01234567" } }
+                    { "uri": "git+https://github.com/Just4Skii/break-me-if-you-can@refs/heads/main", "digest": { "gitCommit": "0123456789abcdef0123456789abcdef01234567" } }
                   ]
                 },
                 "runDetails": {
                   "metadata": {
-                    "invocationId": "https://github.com/Skinny1ne/break-me-if-you-can/actions/runs/1234567890/attempts/1"
+                    "invocationId": "https://github.com/Just4Skii/break-me-if-you-can/actions/runs/1234567890/attempts/1"
                   }
                 }
               }
@@ -62,10 +62,10 @@ public sealed class AttestationPayloadParserTests
               "subject": [ { "digest": { "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } } ],
               "predicateType": "https://breakmeifyoucan.dev/attestation/quality/v1",
               "predicate": {
-                "repository": "Skinny1ne/break-me-if-you-can",
+                "repository": "Just4Skii/break-me-if-you-can",
                 "commitSha": "0123456789abcdef0123456789abcdef01234567",
                 "runId": "42",
-                "workflowRef": "Skinny1ne/break-me-if-you-can/.github/workflows/ci.yml@refs/heads/main"
+                "workflowRef": "Just4Skii/break-me-if-you-can/.github/workflows/ci.yml@refs/heads/main"
               }
             }
             """);
@@ -87,10 +87,10 @@ public sealed class AttestationPayloadParserTests
               "predicateType": "https://slsa.dev/provenance/v0.2",
               "predicate": {
                 "invocation": {
-                  "configSource": { "uri": "git+https://github.com/Skinny1ne/break-me-if-you-can@refs/heads/main" },
+                  "configSource": { "uri": "git+https://github.com/Just4Skii/break-me-if-you-can@refs/heads/main" },
                   "environment": {
                     "github_sha": "0123456789abcdef0123456789abcdef01234567",
-                    "github_repository": "Skinny1ne/break-me-if-you-can",
+                    "github_repository": "Just4Skii/break-me-if-you-can",
                     "github_run_id": "777"
                   }
                 }
@@ -141,7 +141,7 @@ public sealed class AttestationPayloadParserTests
             _type = "https://in-toto.io/Statement/v0.1",
             subject = new[] { new { name = "img", digest = new { sha256 = Sha } } },
             predicateType = "https://slsa.dev/provenance/v1",
-            predicate = new { buildDefinition = new { externalParameters = new { workflow = new { repository = "https://github.com/Skinny1ne/break-me-if-you-can", path = ".github/workflows/ci.yml", @ref = "refs/heads/main" } }, resolvedDependencies = Array.Empty<object>() } },
+            predicate = new { buildDefinition = new { externalParameters = new { workflow = new { repository = "https://github.com/Just4Skii/break-me-if-you-can", path = ".github/workflows/ci.yml", @ref = "refs/heads/main" } }, resolvedDependencies = Array.Empty<object>() } },
         };
 
         var payload = Encode(JsonSerializer.Serialize(statement));
