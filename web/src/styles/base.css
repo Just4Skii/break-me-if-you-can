@@ -135,7 +135,7 @@ button {
 
 .prose {
   color: var(--ink-2);
-  max-width: 68ch;
+  max-width: min(68ch, 680px);
 }
 
 .prose p + p {
@@ -244,15 +244,27 @@ button {
 .range {
   width: 100%;
   appearance: none;
+  height: 18px;
+  background: transparent;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.range::-webkit-slider-runnable-track {
   height: 2px;
   background: var(--line-strong);
-  border-radius: 0;
+}
+
+.range::-moz-range-track {
+  height: 2px;
+  background: var(--line-strong);
 }
 
 .range::-webkit-slider-thumb {
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
+  margin-top: -8px;
   border-radius: 0;
   background: var(--amber);
   border: 2px solid var(--bg);
@@ -307,9 +319,9 @@ button {
 
 .section-head h2 {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink);
 }

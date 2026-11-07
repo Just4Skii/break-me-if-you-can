@@ -151,14 +151,16 @@ function Verdict({
 
 function ChecksSection({ checks }: { checks: ProofCheck[] }) {
   const required = checks.filter((check) => check.required)
-  const verified = required.filter((check) => check.state === 'verified').length
+  const verified = required.filter((check) => check.state === 'verified')
+  const flagged = checks.filter((check) => check.state !== 'verified')
+  const clean = checks.filter((check) => check.state === 'verified')
 
   return (
     <section className="checks" aria-labelledby="checks-title">
       <SectionHead
         label="Evidence ledger"
         title={<span id="checks-title">Required checks</span>}
-        meta={verified + ' / ' + required.length + ' verified'}
+        meta={verified.length + ' / ' + required.length + ' verified'}
       />
       <table className="checks-table">
         <thead>
@@ -175,26 +177,44 @@ function ChecksSection({ checks }: { checks: ProofCheck[] }) {
           </tr>
         </thead>
         <tbody>
-          {checks.map((check) => (
-            <tr key={check.id} className={'check-row check-' + check.state}>
-              <td data-label="State">
-                <span className="check-state">
-                  <StateMark state={check.state} />
-                  <span className={'mono check-state-word state-' + check.state}>{check.state}</span>
-                </span>
-              </td>
-              <td data-label="Check">
-                <span className="check-label">{check.label}</span>
-                <code className="check-id">{check.id}</code>
-              </td>
-              <td data-label="Observed">
-                <p className="check-detail">{check.detail}</p>
+          {flagged.length > 0 ? (
+            <tr className="check-group">
+              <td colSpan={3}>
+                Not verified — {flagged.length}
+                <span className="check-group-note">the reason each release is not verified</span>
               </td>
             </tr>
-          ))}
+          ) : null}
+          {flagged.map(renderCheckRow)}
+          {clean.length > 0 ? (
+            <tr className="check-group">
+              <td colSpan={3}>Verified — {clean.length}</td>
+            </tr>
+          ) : null}
+          {clean.map(renderCheckRow)}
         </tbody>
       </table>
     </section>
+  )
+}
+
+function renderCheckRow(check: ProofCheck) {
+  return (
+    <tr key={check.id} className={'check-row check-' + check.state}>
+      <td data-label="State">
+        <span className="check-state">
+          <StateMark state={check.state} />
+          <span className={'mono check-state-word state-' + check.state}>{check.state}</span>
+        </span>
+      </td>
+      <td data-label="Check">
+        <span className="check-label">{check.label}</span>
+        <code className="check-id">{check.id}</code>
+      </td>
+      <td data-label="Observed">
+        <p className="check-detail">{check.detail}</p>
+      </td>
+    </tr>
   )
 }
 

@@ -7,7 +7,7 @@ import type {
   RunRequest,
   SandboxView,
 } from '../types'
-import { formatDurationMs, formatNumber, formatZar, shortSha } from '../format'
+import { formatDurationMs, formatNumber, formatTimestamp, formatZar, shortSha } from '../format'
 import { CheckIcon, CrossIcon, PlayIcon, RefreshIcon } from '../components/Icons'
 import { SectionHead } from '../components/SectionHead'
 
@@ -296,7 +296,12 @@ export function ArenaPage() {
                   title={'Burst receipt'}
                   meta={formatDurationMs(result.durationMs) + ' wall'}
                 />
-                <span className="run-id mono">run {shortSha(result.runId)}</span>
+                <div className="run-meta">
+                  <span className="run-state">
+                    <span className="dot" /> completed {formatTimestamp(result.completedAt)}
+                  </span>
+                  <span className="run-id mono">run {shortSha(result.runId)}</span>
+                </div>
               </div>
 
               <div className="stat-row">
@@ -352,6 +357,8 @@ export function ArenaPage() {
                 </p>
               ) : null}
 
+              <InvariantsBand result={result} />
+
               <div className="result-grid">
                 <div className="result-panel">
                   <SectionHead label="Latency" title="Per-transfer distribution" meta={result.concurrency + ' concurrent'} />
@@ -369,7 +376,6 @@ export function ArenaPage() {
                       </li>
                     ))}
                   </ul>
-                  <IntegrityList result={result} />
                 </div>
               </div>
 
@@ -514,12 +520,12 @@ function LatencyBars({ result }: { result: ArenaRunResult }) {
   )
 }
 
-function IntegrityList({ result }: { result: ArenaRunResult }) {
+function InvariantsBand({ result }: { result: ArenaRunResult }) {
   const checks = [
     { ok: result.integrity.balanced, label: 'Ledger sums to zero', detail: formatZar(result.integrity.netCents) },
     {
       ok: result.integrity.ledgerEntries === result.integrity.completedTransfers * 2,
-      label: 'Two entries per completed transfer',
+      label: 'Two entries per transfer',
       detail: result.integrity.ledgerEntries + ' entries',
     },
     { ok: result.integrity.malformedTransfers === 0, label: 'No malformed transfers', detail: result.integrity.malformedTransfers + ' found' },
@@ -527,14 +533,30 @@ function IntegrityList({ result }: { result: ArenaRunResult }) {
   ]
 
   return (
-    <ul className="integrity">
-      {checks.map((check) => (
-        <li key={check.label} className={check.ok ? 'state-verified' : 'state-failed'}>
-          {check.ok ? <CheckIcon size={13} /> : <CrossIcon size={13} />}
-          <span className="integrity-label">{check.label}</span>
-          <span className="mono integrity-detail">{check.detail}</span>
-        </li>
-      ))}
-    </ul>
+    <div className={'invariants-band ' + (result.integrity.ok ? 'invariants-ok' : 'invariants-bad')}>
+      <div className="invariants-head">
+        <span className="label">Ledger invariants</span>
+        <span className={'mono ' + (result.integrity.ok ? 'state-verified' : 'state-failed')}>
+          {result.integrity.ok ? 'held' : 'violated'}
+        </span>
+      </div>
+      <ul className="invariants">
+        {checks.map((check) => (
+          <li key={check.label} className={check.ok ? 'state-verified' : 'state-failed'}>
+            {check.ok ? <CheckIcon size={15} /> : <CrossIcon size={15} />}
+            <span className="invariant-label">{check.label}</span>
+            <span className="mono invariant-detail">{check.detail}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="invariants-note">
+        {result.conflicts > 0
+          ? result.conflicts +
+            ' conflicts and ' +
+            result.totalRetries +
+            ' retries are the expected cost of optimistic control. No balance moved without a committed pair of entries.'
+          : 'Pessimistic control serialised the writers: no conflicts, no retries, and the same invariants hold.'}
+      </p>
+    </div>
   )
 }
